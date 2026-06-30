@@ -1,26 +1,26 @@
-// types/index.ts — v3
+// types/index.ts
 export type BreathingType = 'deep' | 'shallow'
 export type FlareStatus = 'new' | 'existing'
 export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snacks'
 export type MealLocation = 'home' | 'outside'
 export type WeeklyPhotoType = 'acne' | 'tongue' | 'flare' | 'body'
 
-// ─── DAILY LOG (expanded) ─────────────────────────────────────
+// ─── DAILY LOG ──────────────────────────────────────────────
 export interface DailyLog {
   id: string
   log_date: string
   weight_kg: number | null
   sleep_hours: number | null
-  energy_level: number | null       // 1–5
+  energy_level: number | null
   brain_fog: boolean
   watched_sunrise: boolean
   watched_sunset: boolean
   breathing: BreathingType | null
-  grounding_done: boolean           // kept for backward compat
+  grounding_done: boolean
   exercised: boolean
   creative_done: boolean
   supplements_taken: boolean
-  reflection: string | null         // one-line reflection
+  reflection: string | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -52,7 +52,7 @@ export interface HealthEvent {
   event_type: string
   start_date: string
   end_date: string | null
-  severity: number | null           // 1–5
+  severity: number | null
   status: FlareStatus
   body_location: string | null
   notes: string | null
@@ -117,6 +117,9 @@ export type MasterCategory =
   | 'health_event_type'
 
 // ─── CHECK-IN PAYLOAD ─────────────────────────────────────────
+// FIXED: added breathing, grounding_done, watched_sunrise, watched_sunset —
+// these exist on DailyLog but were missing here, causing the
+// "does not exist in type CheckInPayload" build error.
 export interface CheckInPayload {
   log_date: string
   weight_kg?: number | null
@@ -126,6 +129,7 @@ export interface CheckInPayload {
   watched_sunrise?: boolean
   watched_sunset?: boolean
   breathing?: BreathingType | null
+  grounding_done?: boolean
   supplements_taken?: boolean
   reflection?: string | null
   notes?: string | null

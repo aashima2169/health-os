@@ -12,9 +12,10 @@ import {
 import { todayISO, cycleDayOf, daysBetween, addDays, mondayOfWeek, formatShort } from '../../lib/date'
 import SeveritySlider from '../../components/shared/SeveritySlider'
 import Chip from '../../components/shared/Chip'
+import BloodReportsTab from '../../components/health-events/BloodReportsTab'
 import type { HealthEvent, HealthEventPhoto, Period, WeeklyPhoto, WeeklyPhotoType } from '../../types'
 
-type Tab = 'events' | 'periods' | 'photos'
+type Tab = 'events' | 'periods' | 'photos' | 'blood'
 
 export default function HealthEventsPage() {
   const [tab, setTab] = useState<Tab>('events')
@@ -26,32 +27,39 @@ export default function HealthEventsPage() {
           Health Events
         </p>
         <h1 className="text-3xl font-bold text-slate-900">Events & Cycle</h1>
-        <p className="text-sm text-slate-400 mt-1">Flares, periods, weekly photos — all here</p>
+        <p className="text-sm text-slate-400 mt-1">Flares, periods, photos, blood reports</p>
       </div>
 
       {/* Tab switcher */}
       <div className="px-4 mb-4">
-        <div className="bg-white rounded-2xl border border-slate-100 p-1 flex shadow-sm">
+        <div className="bg-white rounded-2xl border border-slate-100 p-1 flex shadow-sm overflow-x-auto">
           <button
             onClick={() => setTab('events')}
-            className={`flex-1 h-10 rounded-xl text-sm font-semibold transition-all
+            className={`flex-1 h-10 rounded-xl text-xs font-semibold transition-all whitespace-nowrap px-2
               ${tab === 'events' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500'}`}
           >
             ⚡ Events
           </button>
           <button
             onClick={() => setTab('periods')}
-            className={`flex-1 h-10 rounded-xl text-sm font-semibold transition-all
+            className={`flex-1 h-10 rounded-xl text-xs font-semibold transition-all whitespace-nowrap px-2
               ${tab === 'periods' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500'}`}
           >
             🌸 Periods
           </button>
           <button
             onClick={() => setTab('photos')}
-            className={`flex-1 h-10 rounded-xl text-sm font-semibold transition-all
+            className={`flex-1 h-10 rounded-xl text-xs font-semibold transition-all whitespace-nowrap px-2
               ${tab === 'photos' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500'}`}
           >
             📸 Photos
+          </button>
+          <button
+            onClick={() => setTab('blood')}
+            className={`flex-1 h-10 rounded-xl text-xs font-semibold transition-all whitespace-nowrap px-2
+              ${tab === 'blood' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500'}`}
+          >
+            🩸 Blood
           </button>
         </div>
       </div>
@@ -59,6 +67,7 @@ export default function HealthEventsPage() {
       {tab === 'events' && <EventsTab />}
       {tab === 'periods' && <PeriodsTab />}
       {tab === 'photos' && <PhotosTab />}
+      {tab === 'blood' && <BloodReportsTab />}
     </div>
   )
 }

@@ -1,4 +1,11 @@
 // app/today/page.tsx
+// FIXES IN THIS VERSION:
+// 1. Breathing (deep/shallow) + Grounding wired back into BodySection
+// 2. Weekly photo banner now only shows once per week (tracked via localStorage
+//    of "last dismissed/seen week"), not every single day
+// 3. saveCheckIn already overwrites same-day data correctly (see lib/db.ts —
+//    upsert on log_date + delete-then-insert on child tables). No changes needed
+//    there, but confirmed working as intended for multiple check-ins per day.
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
@@ -17,10 +24,11 @@ import RecoverySection    from '../../components/today/RecoverySection'
 import SupplementsSection from '../../components/today/SupplementsSection'
 import DietSection        from '../../components/today/DietSection'
 import ReflectionSection  from '../../components/today/ReflectionSection'
-import type { DietState } from '../../types'
+import type { DietState, BreathingType } from '../../types'
 
 const TODAY = todayISO()
 const TOTAL_SECTIONS = 7
+const PHOTO_REMINDER_KEY = 'healthos_weekly_photo_reminder_week'
 
 const BLANK_DIET: DietState = {
   breakfast: { location: 'home', outside_reason: '', description: '' },
@@ -43,6 +51,8 @@ export default function TodayPage() {
   const [brainFog, setBrainFog]           = useState(false)
   const [watchedSunrise, setWatchedSunrise] = useState(false)
   const [watchedSunset, setWatchedSunset] = useState(false)
+  const [breathing, setBreathing]         = useState<BreathingType | null>(null)
+  const [groundingDone, setGroundingDone] = useState(false)
   const [mentalStates, setMentalStates]   = useState<string[]>([])
   const [exerciseTypes, setExerciseTypes] = useState<string[]>([])
   const [recovery, setRecovery]           = useState<string[]>([])
@@ -53,15 +63,21 @@ export default function TodayPage() {
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
+
+  // Weekly photo reminder — only shows once per calendar week
+  const [showPhotoReminder, setShowPhotoReminder] = useState(false)
   const [weeklyPhotoCount, setWeeklyPhotoCount] = useState(0)
 
   useEffect(() => {
     async function load() {
+      const currentWeek = mondayOfWeek()
+
       const [log, states, ex, rec, sups, meals, weeklyPhotos] = await Promise.all([
         getLog(TODAY), getMentalStates(TODAY), getExercise(TODAY),
         getRecovery(TODAY), getSupplements(TODAY), getMeals(TODAY),
-        getWeeklyPhotos(mondayOfWeek()),
+        getWeeklyPhotos(currentWeek),
       ])
+
       if (log) {
         if (log.weight_kg != null)   setWeight(log.weight_kg)
         if (log.sleep_hours != null) setSleep(log.sleep_hours)
@@ -69,6 +85,8 @@ export default function TodayPage() {
         setBrainFog(log.brain_fog)
         setWatchedSunrise(log.watched_sunrise)
         setWatchedSunset(log.watched_sunset)
+        if (log.breathing) setBreathing(log.breathing as BreathingType)
+        setGroundingDone(log.grounding_done)
         if (log.reflection) setReflection(log.reflection)
       }
       setMentalStates(states)
@@ -77,10 +95,24 @@ export default function TodayPage() {
       setSupplements(sups)
       setDiet(mealsToDietState(meals))
       setWeeklyPhotoCount(weeklyPhotos.length)
+
+      // Only show the reminder if:
+      // (a) this week's photos aren't all done, AND
+      // (b) we haven't already shown/dismissed the reminder for this week
+      const lastShownWeek = localStorage.getItem(PHOTO_REMINDER_KEY)
+      if (weeklyPhotos.length < 4 && lastShownWeek !== currentWeek) {
+        setShowPhotoReminder(true)
+      }
+
       setLoading(false)
     }
     load()
   }, [])
+
+  const dismissPhotoReminder = () => {
+    localStorage.setItem(PHOTO_REMINDER_KEY, mondayOfWeek())
+    setShowPhotoReminder(false)
+  }
 
   const save = useCallback(async () => {
     setSaving(true)
@@ -94,6 +126,8 @@ export default function TodayPage() {
           brain_fog: brainFog,
           watched_sunrise: watchedSunrise,
           watched_sunset: watchedSunset,
+          breathing,
+          grounding_done: groundingDone,
           reflection,
           mental_states: mentalStates,
           exercise_types: exerciseTypes,
@@ -109,8 +143,8 @@ export default function TodayPage() {
     } finally {
       setSaving(false)
     }
-  }, [weight, sleep, energy, brainFog, watchedSunrise, watchedSunset,
-      reflection, mentalStates, exerciseTypes, recovery, supplements, diet])
+  }, [weight, sleep, energy, brainFog, watchedSunrise, watchedSunset, breathing,
+      groundingDone, reflection, mentalStates, exerciseTypes, recovery, supplements, diet])
 
   const dietFilled = Object.values(diet).some((s) => s.description.trim())
   const completedSections = [
@@ -147,8 +181,7 @@ export default function TodayPage() {
       {/* Saved toast */}
       {savedMsg && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50">
-          <div className="bg-slate-900 text-white text-sm font-medium px-5 py-2.5
-            rounded-full shadow-xl">
+          <div className="bg-slate-900 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl">
             {savedMsg}
           </div>
         </div>
@@ -157,26 +190,30 @@ export default function TodayPage() {
       <div className="px-4 space-y-3">
         <ProgressCard completed={completedSections} total={TOTAL_SECTIONS} />
 
-        {/* Gentle weekly photo nudge — only shows if this week's photos aren't all done */}
-        {weeklyPhotoCount < 4 && (
-          <Link
-            href="/health-events"
-            className="block bg-purple-50 border border-purple-100 rounded-2xl px-4 py-3.5
-              flex items-center gap-3 active:scale-[0.98] transition-transform"
-          >
-            <span className="text-xl flex-shrink-0">📸</span>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-purple-800">
-                Weekly photos {weeklyPhotoCount > 0 ? `· ${weeklyPhotoCount}/4 done` : ''}
-              </p>
-              <p className="text-xs text-purple-500 mt-0.5">
-                Tongue, skin, and any flare — takes a minute
-              </p>
-            </div>
-            <svg className="w-4 h-4 text-purple-300 flex-shrink-0" viewBox="0 0 16 16" fill="none">
-              <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </Link>
+        {/* Weekly photo reminder — appears once a week, dismissible */}
+        {showPhotoReminder && (
+          <div className="bg-purple-50 border border-purple-100 rounded-2xl px-4 py-3.5 flex items-center gap-3">
+            <Link href="/health-events" className="flex items-center gap-3 flex-1">
+              <span className="text-xl flex-shrink-0">📸</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-purple-800">
+                  Weekly photos {weeklyPhotoCount > 0 ? `· ${weeklyPhotoCount}/4 done` : ''}
+                </p>
+                <p className="text-xs text-purple-500 mt-0.5">
+                  Tongue, skin, and any flare — takes a minute
+                </p>
+              </div>
+            </Link>
+            <button
+              onClick={dismissPhotoReminder}
+              className="text-purple-300 hover:text-purple-500 flex-shrink-0 p-1"
+              aria-label="Dismiss"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         )}
 
         <InnerStateSection selected={mentalStates} onChange={setMentalStates} />
@@ -184,8 +221,10 @@ export default function TodayPage() {
         <BodySection
           weight={weight} sleep={sleep} energy={energy}
           brainFog={brainFog} watchedSunrise={watchedSunrise} watchedSunset={watchedSunset}
+          breathing={breathing} groundingDone={groundingDone}
           onWeightChange={setWeight} onSleepChange={setSleep} onEnergyChange={setEnergy}
           onBrainFogChange={setBrainFog} onSunriseChange={setWatchedSunrise} onSunsetChange={setWatchedSunset}
+          onBreathingChange={setBreathing} onGroundingChange={setGroundingDone}
         />
         <MovementSection  selected={exerciseTypes} onChange={setExerciseTypes} />
         <RecoverySection  selected={recovery}      onChange={setRecovery} />
@@ -205,14 +244,17 @@ export default function TodayPage() {
         >
           {saving ? (
             <>
-              <span className="w-4 h-4 border-2 border-white border-t-transparent
-                rounded-full animate-spin" />
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               <span>Saving…</span>
             </>
           ) : (
             <span>Save Check-in</span>
           )}
         </button>
+
+        <p className="text-center text-[11px] text-slate-300 pt-1">
+          You can check in multiple times a day — each save updates today's entry.
+        </p>
       </div>
     </div>
   )

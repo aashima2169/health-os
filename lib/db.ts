@@ -203,18 +203,18 @@ export async function deleteMealItem(slot: MealSlot, itemName: string) {
 export async function saveCheckIn(payload: CheckInPayload) {
   const {
     log_date, weight_kg, sleep_hours, energy_level, brain_fog,
-    watched_sunrise, watched_sunset, breathing, supplements_taken,
-    reflection, notes, mental_states = [], exercise_types = [],
-    recovery_activities = [], supplements = [],
+    watched_sunrise, watched_sunset, breathing, grounding_done,
+    supplements_taken, reflection, notes,
+    mental_states = [], exercise_types = [], recovery_activities = [], supplements = [],
   } = payload
-
+ 
   await supabase.from('daily_logs').upsert({
     log_date, weight_kg, sleep_hours, energy_level, brain_fog,
-    watched_sunrise, watched_sunset, breathing,
+    watched_sunrise, watched_sunset, breathing, grounding_done,
     supplements_taken: supplements_taken ?? supplements.length > 0,
     reflection, notes,
   }, { onConflict: 'log_date' })
-
+ 
   await Promise.all([
     setMentalStates(log_date, mental_states),
     setExercise(log_date, exercise_types),

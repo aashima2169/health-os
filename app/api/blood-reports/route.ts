@@ -1,12 +1,12 @@
 // app/api/blood-reports/route.ts
+// Upload PDF → extract markers via Gemini → save to blood_reports table
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '../../../lib/supabase'
 
 const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!
 
-// ─── POST: Upload PDF → extract markers → save report ─────────
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData()
@@ -15,13 +15,9 @@ export async function POST(req: NextRequest) {
     const notes = (formData.get('notes') as string | null) ?? ''
 
     if (!file || !reportDate) {
-      return NextResponse.json(
-        { error: 'file and report_date are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'file and report_date are required' }, { status: 400 })
     }
 
-    // 1. Upload PDF to Supabase Storage
     const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`
     const fileBuffer = await file.arrayBuffer()
 
@@ -34,18 +30,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File upload failed' }, { status: 500 })
     }
 
-    const { data: urlData } = supabase.storage
-      .from('blood-reports')
-      .getPublicUrl(storageData.path)
+    const { data: urlData } = supabase.storage.from('blood-reports').getPublicUrl(storageData.path)
     const fileUrl = urlData.publicUrl
 
-    // 2. Convert PDF to base64 for Gemini
     const base64PDF = Buffer.from(fileBuffer).toString('base64')
-
-    // 3. Ask Gemini to extract markers
     const markers = await extractMarkersWithGemini(base64PDF)
 
-    // 4. Save to blood_reports table
     const { data: report, error: dbError } = await supabase
       .from('blood_reports')
       .insert({ report_date: reportDate, file_url: fileUrl, markers, notes })
@@ -64,14 +54,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ─── GET: Fetch all reports ────────────────────────────────────
 export async function GET() {
   try {
     const { data, error } = await supabase
-      .from('blood_reports')
-      .select('*')
-      .order('report_date', { ascending: false })
-
+      .from('blood_reports').select('*').order('report_date', { ascending: false })
     if (error) throw error
     return NextResponse.json({ reports: data ?? [] })
   } catch (err) {
@@ -80,19 +66,14 @@ export async function GET() {
   }
 }
 
-// ─── DELETE: Remove report + file ─────────────────────────────
 export async function DELETE(req: NextRequest) {
   try {
     const { id, file_url } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
-    // Remove from storage
     if (file_url) {
-      const parts = file_url.split('/blood-reports/')
-      const path = parts[1]
-      if (path) {
-        await supabase.storage.from('blood-reports').remove([path])
-      }
+      const path = file_url.split('/blood-reports/')[1]
+      if (path) await supabase.storage.from('blood-reports').remove([path])
     }
 
     await supabase.from('blood_reports').delete().eq('id', id)
@@ -103,7 +84,6 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-// ─── Gemini PDF marker extraction ─────────────────────────────
 async function extractMarkersWithGemini(
   base64PDF: string
 ): Promise<Record<string, { value: number; unit: string; reference?: string }>> {
@@ -114,15 +94,14 @@ Rules:
 - Extract every marker/test result you can find.
 - For each marker return: the numeric value, the unit, and the reference range if shown.
 - Normalise marker names to standard English (e.g. "Haemoglobin" → "Hemoglobin").
-- If a value is marked as "<0.01" or ">100", use the numeric boundary (0.01 or 100).
-- Ignore non-numeric results (e.g. "Positive"/"Negative") unless they have a numeric equivalent.
+- If a value is marked as "<0.01" or ">100", use the numeric boundary.
+- Ignore non-numeric results unless they have a numeric equivalent.
 - Return ONLY valid JSON, no markdown, no preamble.
 
 JSON shape:
 {
   "Hemoglobin": { "value": 13.2, "unit": "g/dL", "reference": "12.0 - 17.0" },
-  "TSH": { "value": 2.4, "unit": "mIU/L", "reference": "0.4 - 4.0" },
-  "Vitamin D": { "value": 18.5, "unit": "ng/mL", "reference": "30 - 100" }
+  "TSH": { "value": 2.4, "unit": "mIU/L", "reference": "0.4 - 4.0" }
 }
 `.trim()
 
@@ -130,19 +109,12 @@ JSON shape:
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      contents: [
-        {
-          parts: [
-            {
-              inline_data: {
-                mime_type: 'application/pdf',
-                data: base64PDF,
-              },
-            },
-            { text: prompt },
-          ],
-        },
-      ],
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: 'application/pdf', data: base64PDF } },
+          { text: prompt },
+        ],
+      }],
       generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
     }),
   })

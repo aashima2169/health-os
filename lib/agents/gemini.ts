@@ -1,6 +1,11 @@
 // lib/agents/gemini.ts
+// FIXED: promptVersion is now optional in CallOptions. Your local version had
+// it as required, which broke any caller (like the health-intelligence route)
+// that didn't pass it. It's accepted for logging/traceability but not
+// required, since it's not used in the actual Gemini request.
+
 const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 
 interface TextPart   { type: 'text';     text: string }
 interface ImagePart  { type: 'image';    base64: string; mimeType: string }
@@ -9,7 +14,7 @@ type GeminiPart = TextPart | ImagePart | DocPart
 
 interface CallOptions {
   agentId: string
-  promptVersion: string
+  promptVersion?: string   // optional — kept for logging/traceability only
   systemPrompt: string
   userParts: GeminiPart[]
   temperature?: number
@@ -49,7 +54,7 @@ export async function callGeminiAgent<T>(opts: CallOptions): Promise<T> {
   try {
     return JSON.parse(clean) as T
   } catch {
-    console.error(`[${opts.agentId}] Invalid JSON:`, clean)
+    console.error(`[${opts.agentId}${opts.promptVersion ? ' ' + opts.promptVersion : ''}] Invalid JSON:`, clean)
     throw new Error(`Agent ${opts.agentId} returned invalid JSON`)
   }
 }
