@@ -28,11 +28,11 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { getLog, getMentalStates, getFoods, getExercise, getSupplements } = await import('../../../lib/db')
+    const { getLog, getMentalStates, getMeals, getExercise, getSupplements } = await import('../../../lib/db')
     const [log, mentalStates, foods, exerciseTypes, supplements] = await Promise.all([
       getLog(date),
       getMentalStates(date),
-      getFoods(date),
+      getMeals(date),
       getExercise(date),
       getSupplements(date),
     ])

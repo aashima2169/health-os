@@ -8,11 +8,12 @@ interface DocPart    { type: 'document'; base64: string; mimeType: 'application/
 type GeminiPart = TextPart | ImagePart | DocPart
 
 interface CallOptions {
+  agentId: string
+  promptVersion: string
   systemPrompt: string
   userParts: GeminiPart[]
   temperature?: number
   maxOutputTokens?: number
-  agentId: string
 }
 
 function buildParts(parts: GeminiPart[]) {
