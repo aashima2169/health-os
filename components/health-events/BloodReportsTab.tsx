@@ -1,5 +1,6 @@
 // components/health-events/BloodReportsTab.tsx
-// Add this as a 4th tab in app/health-events/page.tsx
+// UPDATED: reports with extraction_status === 'failed' now show a visible
+// "Retry extraction" button that re-runs Gemini without re-uploading the PDF.
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
@@ -46,10 +47,18 @@ export default function BloodReportsTab() {
 
       const res = await fetch('/api/blood-reports', { method: 'POST', body: form })
       if (!res.ok) throw new Error('Upload failed')
+      const json = await res.json()
 
-      setSelectedFile(null); setReportDate(''); setNotes(''); setShowUpload(false)
+      setSelectedFile(null); setReportDate(''); setNotes('')
       if (fileInputRef.current) fileInputRef.current.value = ''
       await loadReports()
+
+      if (json.warning) {
+        setUploadError(json.warning)
+        // keep the panel open so the warning is visible
+      } else {
+        setShowUpload(false)
+      }
     } catch {
       setUploadError('Upload failed. Check your Gemini API key and Supabase storage settings.')
     } finally {
@@ -65,6 +74,25 @@ export default function BloodReportsTab() {
       body: JSON.stringify({ id: report.id, file_url: report.file_url }),
     })
     setReports((r) => r.filter((x) => x.id !== report.id))
+  }
+
+  async function handleRetry(reportId: string) {
+    setReports((prev) => prev.map((r) =>
+      r.id === reportId ? { ...r, extraction_status: 'pending' as any } : r
+    ))
+    try {
+      const res = await fetch('/api/blood-reports/retry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: reportId }),
+      })
+      const json = await res.json()
+      if (json.report) {
+        setReports((prev) => prev.map((r) => r.id === reportId ? json.report : r))
+      }
+    } catch {
+      await loadReports()
+    }
   }
 
   return (
@@ -139,7 +167,11 @@ export default function BloodReportsTab() {
             />
           </div>
 
-          {uploadError && <p className="text-sm text-red-500 mb-3">{uploadError}</p>}
+          {uploadError && (
+            <div className="bg-orange-50 border border-orange-100 rounded-xl px-3 py-2.5 mb-3">
+              <p className="text-xs text-orange-700">{uploadError}</p>
+            </div>
+          )}
 
           <button
             type="button" onClick={handleUpload} disabled={uploading}
@@ -174,34 +206,56 @@ export default function BloodReportsTab() {
         </div>
       ) : (
         reports.map((report) => (
-          <ReportCard key={report.id} report={report} onDelete={() => handleDelete(report)} />
+          <ReportCard
+            key={report.id}
+            report={report}
+            onDelete={() => handleDelete(report)}
+            onRetry={() => handleRetry(report.id)}
+          />
         ))
       )}
     </div>
   )
 }
 
-function ReportCard({ report, onDelete }: { report: BloodReport; onDelete: () => void }) {
+function ReportCard({
+  report, onDelete, onRetry,
+}: {
+  report: BloodReport
+  onDelete: () => void
+  onRetry: () => void
+}) {
   const [expanded, setExpanded] = useState(false)
   const markers = report.markers as Record<string, MarkerEntry> | null
   const markerEntries = markers ? Object.entries(markers) : []
+  const status = (report as any).extraction_status as 'success' | 'failed' | 'pending' | undefined
+  const extractionErrorMsg = (report as any).extraction_error as string | undefined
+  const isFailed = status === 'failed' || (markerEntries.length === 0 && status !== 'pending')
+  const isRetrying = status === 'pending'
 
   const displayDate = new Date(report.report_date + 'T00:00:00').toLocaleDateString('en-IN', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+    <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden
+      ${isFailed ? 'border-orange-200' : 'border-slate-100'}`}>
       <button type="button" className="w-full flex items-center justify-between px-5 py-4"
         onClick={() => setExpanded((e) => !e)}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
-            <span className="text-lg">🩸</span>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
+            ${isFailed ? 'bg-orange-50' : 'bg-red-50'}`}>
+            <span className="text-lg">{isFailed ? '⚠️' : '🩸'}</span>
           </div>
           <div className="text-left">
             <p className="font-semibold text-[15px] text-slate-900">{displayDate}</p>
             <p className="text-xs text-slate-400 mt-0.5">
-              {markerEntries.length} markers extracted{report.notes ? ` · ${report.notes}` : ''}
+              {isRetrying
+                ? 'Retrying extraction…'
+                : isFailed
+                  ? 'Extraction failed — tap to retry'
+                  : `${markerEntries.length} markers extracted`}
+              {report.notes ? ` · ${report.notes}` : ''}
             </p>
           </div>
         </div>
@@ -221,15 +275,38 @@ function ReportCard({ report, onDelete }: { report: BloodReport; onDelete: () =>
 
       {expanded && (
         <div className="px-5 pb-5 border-t border-slate-100 pt-4">
-          {markerEntries.length === 0 ? (
-            <p className="text-sm text-slate-400">No markers could be extracted from this report.</p>
-          ) : (
+          {isFailed && (
+            <div className="bg-orange-50 border border-orange-100 rounded-xl px-3 py-3 mb-4">
+              <p className="text-xs text-orange-700 mb-2">
+                {extractionErrorMsg || 'No markers could be extracted from this report.'}
+              </p>
+              <button
+                type="button"
+                onClick={onRetry}
+                disabled={isRetrying}
+                className="text-xs font-semibold text-orange-700 bg-white border border-orange-200
+                  rounded-full px-3 py-1.5 disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {isRetrying ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+                    Retrying…
+                  </>
+                ) : (
+                  <>↻ Retry extraction</>
+                )}
+              </button>
+            </div>
+          )}
+
+          {markerEntries.length > 0 && (
             <div className="space-y-2">
               {markerEntries.map(([name, data]) => (
                 <MarkerRow key={name} name={name} data={data} />
               ))}
             </div>
           )}
+
           <button type="button" onClick={onDelete} className="mt-5 text-xs text-red-400 font-medium">
             Delete report
           </button>

@@ -1,11 +1,15 @@
 // app/api/blood-reports/route.ts
-// Upload PDF → extract markers via Gemini → save to blood_reports table
+// FIXES:
+// 1. maxOutputTokens raised to 8192 — prevents truncation on large CBC panels
+// 2. repairTruncatedJSON() salvages partial output when MAX_TOKENS is hit
+// 3. Extraction logic moved to lib/extractMarkers.ts and imported here —
+//    route.ts files may only export HTTP handlers (GET/POST/etc.) and a
+//    small set of config options, so exporting extractMarkersFromPDF
+//    directly from this file fails Next's route type check.
+// 4. Analysis is now separate — lives in /api/agents/blood-analysis/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '../../../lib/supabase'
-
-const GEMINI_URL =
-  'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY!
+import { extractMarkersFromPDF } from '../../../lib/extractMarkers'
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,15 +34,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File upload failed' }, { status: 500 })
     }
 
-    const { data: urlData } = supabase.storage.from('blood-reports').getPublicUrl(storageData.path)
+    const { data: urlData } = supabase.storage
+      .from('blood-reports').getPublicUrl(storageData.path)
     const fileUrl = urlData.publicUrl
 
     const base64PDF = Buffer.from(fileBuffer).toString('base64')
-    const markers = await extractMarkersWithGemini(base64PDF)
+    const { markers, extractionError } = await extractMarkersFromPDF(base64PDF)
 
     const { data: report, error: dbError } = await supabase
       .from('blood_reports')
-      .insert({ report_date: reportDate, file_url: fileUrl, markers, notes })
+      .insert({
+        report_date: reportDate,
+        file_url: fileUrl,
+        markers,
+        notes,
+        extraction_status: extractionError ? 'failed' : 'success',
+        extraction_error: extractionError ?? null,
+      })
       .select()
       .single()
 
@@ -47,7 +59,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Database insert failed' }, { status: 500 })
     }
 
-    return NextResponse.json({ report })
+    return NextResponse.json({
+      report,
+      warning: extractionError
+        ? `Marker extraction failed: ${extractionError}. PDF saved — tap Retry on the report.`
+        : undefined,
+    })
   } catch (err) {
     console.error('[blood-reports POST] error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -70,68 +87,14 @@ export async function DELETE(req: NextRequest) {
   try {
     const { id, file_url } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-
     if (file_url) {
       const path = file_url.split('/blood-reports/')[1]
       if (path) await supabase.storage.from('blood-reports').remove([path])
     }
-
     await supabase.from('blood_reports').delete().eq('id', id)
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[blood-reports DELETE] error:', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
-
-async function extractMarkersWithGemini(
-  base64PDF: string
-): Promise<Record<string, { value: number; unit: string; reference?: string }>> {
-  const prompt = `
-You are a medical report parser. Extract all lab test markers from this blood report PDF.
-
-Rules:
-- Extract every marker/test result you can find.
-- For each marker return: the numeric value, the unit, and the reference range if shown.
-- Normalise marker names to standard English (e.g. "Haemoglobin" → "Hemoglobin").
-- If a value is marked as "<0.01" or ">100", use the numeric boundary.
-- Ignore non-numeric results unless they have a numeric equivalent.
-- Return ONLY valid JSON, no markdown, no preamble.
-
-JSON shape:
-{
-  "Hemoglobin": { "value": 13.2, "unit": "g/dL", "reference": "12.0 - 17.0" },
-  "TSH": { "value": 2.4, "unit": "mIU/L", "reference": "0.4 - 4.0" }
-}
-`.trim()
-
-  const response = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { inline_data: { mime_type: 'application/pdf', data: base64PDF } },
-          { text: prompt },
-        ],
-      }],
-      generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
-    }),
-  })
-
-  if (!response.ok) {
-    console.error('[gemini extract] failed:', await response.text())
-    return {}
-  }
-
-  const geminiData = await response.json()
-  const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}'
-  const clean = text.replace(/```json|```/g, '').trim()
-
-  try {
-    return JSON.parse(clean)
-  } catch {
-    console.error('[gemini extract] JSON parse failed:', clean)
-    return {}
   }
 }
