@@ -1,15 +1,8 @@
 // app/api/blood-reports/route.ts
-// FIXES:
-// 1. maxOutputTokens raised to 8192 — prevents truncation on large CBC panels
-// 2. repairTruncatedJSON() salvages partial output when MAX_TOKENS is hit
-// 3. Extraction logic moved to lib/extractMarkers.ts and imported here —
-//    route.ts files may only export HTTP handlers (GET/POST/etc.) and a
-//    small set of config options, so exporting extractMarkersFromPDF
-//    directly from this file fails Next's route type check.
-// 4. Analysis is now separate — lives in /api/agents/blood-analysis/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '../../../lib/supabase'
 import { extractMarkersFromPDF } from '../../../lib/extractMarkers'
+import { regenerateBloodIntelligence } from '../../../lib/agents/bloodIntelligence'
 
 export async function POST(req: NextRequest) {
   try {
@@ -57,6 +50,16 @@ export async function POST(req: NextRequest) {
     if (dbError) {
       console.error('[blood-reports] db error:', dbError)
       return NextResponse.json({ error: 'Database insert failed' }, { status: 500 })
+    }
+
+    // Event-driven regeneration: fire-and-forget so the upload response
+    // returns immediately rather than blocking ~90s for the full A1 -> A3
+    // regeneration chain. The Insights page picks up the 'generating'
+    // status and polls until it's done.
+    if (!extractionError) {
+      regenerateBloodIntelligence().catch((err) =>
+        console.error('[blood-reports] A1 regeneration after upload failed:', err),
+      )
     }
 
     return NextResponse.json({

@@ -1,4 +1,12 @@
 // app/history/page.tsx
+// FIX: weekday name was rendering center-aligned while the pills row right
+// below it stayed left-aligned — same parent div, so something outside
+// this component (a global style / layout wrapper / CSS reset) was
+// forcing text-align: center onto the <p>. Explicit text-left added so it
+// can't be overridden by inherited styles. Also added flex-1 min-w-0 to
+// the text container so its width is driven by the row, not by whichever
+// child happens to be widest — keeps alignment stable across cards with
+// different pill counts.
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -38,7 +46,6 @@ export default function HistoryPage() {
             getRecovery(log.log_date),
             getActivePeriod(log.log_date),
           ])
-          // Health events active on this date
           const events = allEvents.filter((e) =>
             e.start_date <= log.log_date && (!e.end_date || e.end_date >= log.log_date)
           )
@@ -93,19 +100,19 @@ function DayCard({ row }: { row: DayRow }) {
     <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
       <button type="button" className="w-full flex items-center justify-between px-5 py-4"
         onClick={() => setExpanded((e) => !e)}>
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col items-center bg-blue-50 rounded-xl px-3 py-1.5 min-w-[44px]">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex flex-col items-center bg-blue-50 rounded-xl px-3 py-1.5 min-w-[44px] flex-shrink-0">
             <span className="text-[11px] text-blue-600 font-semibold uppercase">
               {date.toLocaleDateString('en-IN', { month: 'short' })}
             </span>
             <span className="text-xl font-bold text-slate-900 leading-none">{date.getDate()}</span>
           </div>
 
-          <div>
-            <p className="font-semibold text-[14px] text-slate-900">
+          <div className="flex-1 min-w-0 text-left">
+            <p className="font-semibold text-[14px] text-slate-900 text-left">
               {date.toLocaleDateString('en-IN', { weekday: 'long' })}
             </p>
-            <div className="flex flex-wrap gap-1 mt-1">
+            <div className="flex flex-wrap gap-1 mt-1 justify-start">
               {log.weight_kg != null && (
                 <Pill text={`${log.weight_kg} kg`} />
               )}
@@ -118,7 +125,7 @@ function DayCard({ row }: { row: DayRow }) {
           </div>
         </div>
 
-        <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+        <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 flex-shrink-0 ${expanded ? 'rotate-180' : ''}`}
           viewBox="0 0 16 16" fill="none">
           <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
@@ -161,11 +168,11 @@ function Pill({ text, color = 'slate' }: { text: string; color?: 'slate' | 'red'
 function DetailRow({ label, value, accent = 'slate' }: { label: string; value: string; accent?: 'slate' | 'orange' }) {
   const colors = { slate: 'text-slate-700', orange: 'text-orange-600' }
   return (
-    <div className="flex gap-3">
-      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide w-24 flex-shrink-0 pt-0.5">
+    <div className="flex gap-3 text-left">
+      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide w-24 flex-shrink-0 pt-0.5 text-left">
         {label}
       </span>
-      <span className={`text-sm ${colors[accent]}`}>{value}</span>
+      <span className={`text-sm text-left ${colors[accent]}`}>{value}</span>
     </div>
   )
 }

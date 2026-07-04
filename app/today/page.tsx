@@ -6,6 +6,11 @@
 // 3. saveCheckIn already overwrites same-day data correctly (see lib/db.ts —
 //    upsert on log_date + delete-then-insert on child tables). No changes needed
 //    there, but confirmed working as intended for multiple check-ins per day.
+// 4. NEW: dedicated tongue-photo reminder, separate from the general weekly
+//    photo banner above. Shows ONLY on Saturdays (habit-forming weekly
+//    cadence), and only if this week's tongue photo hasn't been uploaded
+//    yet. Dismissible per-week, tracked separately from the general banner
+//    so dismissing one doesn't dismiss the other.
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
@@ -29,6 +34,7 @@ import type { DietState, BreathingType } from '../../types'
 const TODAY = todayISO()
 const TOTAL_SECTIONS = 7
 const PHOTO_REMINDER_KEY = 'healthos_weekly_photo_reminder_week'
+const TONGUE_REMINDER_KEY = 'healthos_tongue_photo_reminder_week'
 
 const BLANK_DIET: DietState = {
   breakfast: { location: 'home', outside_reason: '', description: '' },
@@ -64,9 +70,13 @@ export default function TodayPage() {
   const [saving, setSaving]     = useState(false)
   const [savedMsg, setSavedMsg] = useState('')
 
-  // Weekly photo reminder — only shows once per calendar week
+  // General weekly photo reminder — only shows once per calendar week
   const [showPhotoReminder, setShowPhotoReminder] = useState(false)
   const [weeklyPhotoCount, setWeeklyPhotoCount] = useState(0)
+
+  // Tongue-specific reminder — Saturdays only, tracked independently of
+  // the general banner above so dismissing one doesn't dismiss the other.
+  const [showTongueReminder, setShowTongueReminder] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -96,12 +106,20 @@ export default function TodayPage() {
       setDiet(mealsToDietState(meals))
       setWeeklyPhotoCount(weeklyPhotos.length)
 
-      // Only show the reminder if:
-      // (a) this week's photos aren't all done, AND
-      // (b) we haven't already shown/dismissed the reminder for this week
+      // General reminder: only if this week's photos aren't all done, and
+      // we haven't already shown/dismissed it for this week.
       const lastShownWeek = localStorage.getItem(PHOTO_REMINDER_KEY)
       if (weeklyPhotos.length < 4 && lastShownWeek !== currentWeek) {
         setShowPhotoReminder(true)
+      }
+
+      // Tongue reminder: Saturdays only, and only if this week's tongue
+      // photo hasn't been uploaded yet, and not already dismissed this week.
+      const isSaturday = new Date().getDay() === 6
+      const tongueDoneThisWeek = weeklyPhotos.some((p) => p.photo_type === 'tongue')
+      const lastShownTongueWeek = localStorage.getItem(TONGUE_REMINDER_KEY)
+      if (isSaturday && !tongueDoneThisWeek && lastShownTongueWeek !== currentWeek) {
+        setShowTongueReminder(true)
       }
 
       setLoading(false)
@@ -112,6 +130,11 @@ export default function TodayPage() {
   const dismissPhotoReminder = () => {
     localStorage.setItem(PHOTO_REMINDER_KEY, mondayOfWeek())
     setShowPhotoReminder(false)
+  }
+
+  const dismissTongueReminder = () => {
+    localStorage.setItem(TONGUE_REMINDER_KEY, mondayOfWeek())
+    setShowTongueReminder(false)
   }
 
   const save = useCallback(async () => {
@@ -189,6 +212,32 @@ export default function TodayPage() {
 
       <div className="px-4 space-y-3">
         <ProgressCard completed={completedSections} total={TOTAL_SECTIONS} />
+
+        {/* Tongue photo reminder — Saturdays only, builds a weekly habit */}
+        {showTongueReminder && (
+          <div className="bg-rose-50 border border-rose-100 rounded-2xl px-4 py-3.5 flex items-center gap-3">
+            <Link href="/health-events" className="flex items-center gap-3 flex-1">
+              <span className="text-xl flex-shrink-0">👅</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-rose-800">
+                  Saturday tongue photo
+                </p>
+                <p className="text-xs text-rose-500 mt-0.5">
+                  Same day each week helps the TCM reading stay comparable
+                </p>
+              </div>
+            </Link>
+            <button
+              onClick={dismissTongueReminder}
+              className="text-rose-300 hover:text-rose-500 flex-shrink-0 p-1"
+              aria-label="Dismiss"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
+                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {/* Weekly photo reminder — appears once a week, dismissible */}
         {showPhotoReminder && (

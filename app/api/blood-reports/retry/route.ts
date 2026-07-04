@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '../../../../lib/supabase'
 import { extractMarkersFromPDF } from '../../../../lib/extractMarkers'
+import { regenerateBloodIntelligence } from '../../../../lib/agents/bloodIntelligence'
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,6 +41,13 @@ export async function POST(req: NextRequest) {
     if (updateError) {
       console.error('[blood-reports retry] update error:', updateError)
       return NextResponse.json({ error: 'Failed to update report' }, { status: 500 })
+    }
+
+    // Fire-and-forget — same reasoning as the main upload route.
+    if (!extractionError) {
+      regenerateBloodIntelligence().catch((err) =>
+        console.error('[blood-reports retry] A1 regeneration after retry failed:', err),
+      )
     }
 
     return NextResponse.json({
