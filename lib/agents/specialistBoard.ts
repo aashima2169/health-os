@@ -97,9 +97,9 @@ export async function runPhysician(bloodResult: Record<string, any>, history: Hi
 }
 
 export async function runDermatologist(bloodResult: Record<string, any>, history: History, period: Period) {
-  return runSpecialist('A3b', period, DERMATOLOGIST_VERSION, DERMATOLOGIST_PROMPT, 'Flare log entries, meals, and Blood Intelligence output for context', {
+  return runSpecialist('A3b', period, DERMATOLOGIST_VERSION, DERMATOLOGIST_PROMPT, 'Logged health events (flares, etc.), meals, and Blood Intelligence output for context', {
     blood_intelligence: bloodResult,
-    flares: history.flares,
+    health_events: history.healthEvents,
     meals: history.meals,
   })
 }
@@ -123,10 +123,11 @@ export async function runGutMicrobiomeDoctor(bloodResult: Record<string, any>, h
 }
 
 export async function runNutritionist(bloodResult: Record<string, any>, history: History, period: Period) {
-  return runSpecialist('A3f', period, NUTRITIONIST_VERSION, NUTRITIONIST_PROMPT, 'Meals, supplements, and Blood Intelligence output for context', {
+  return runSpecialist('A3f', period, NUTRITIONIST_VERSION, NUTRITIONIST_PROMPT, 'Meals, supplements, daily logs (including weight), and Blood Intelligence output for context', {
     blood_intelligence: bloodResult,
     meals: history.meals,
     supplements: history.supplements,
+    daily_logs: history.logs,
   })
 }
 

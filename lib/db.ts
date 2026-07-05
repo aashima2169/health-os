@@ -1,4 +1,15 @@
-// lib/db.ts
+// lib/db.ts — FULL FILE, REPLACE YOUR EXISTING lib/db.ts ENTIRELY WITH THIS
+// This consolidates every db function used across the app into one file
+// so there are no more cross-file import mismatches.
+//
+// NOTE: flares are NOT a separate table — they're logged as health_events
+// (Events tab), already covered by getAllHealthEvents / getFullHistory's
+// healthEvents field. An earlier pass incorrectly added a query against a
+// 'flares' table that doesn't exist; reverted.
+//
+// ADDED: getLatestTonguePhoto for the TCM specialist (weekly_photos table,
+// photo_type = 'tongue', confirmed against the actual Photos tab schema).
+
 import { supabase } from './supabase'
 import type {
   DailyLog, Meal, MealSlot, MealLocation, DietState,
@@ -152,6 +163,8 @@ export async function getOutsideReasons(): Promise<string[]> {
 }
 
 // ─── MEAL ITEMS (quick-add master list for Diet section) ──────
+// These were previously in a separate lib/db.meal-items.ts file.
+// They now live here so all imports resolve from '../../lib/db'.
 
 export async function getMealItems(slot: MealSlot): Promise<string[]> {
   const { data } = await supabase
@@ -287,24 +300,6 @@ export async function uploadEventPhoto(
   return data
 }
 
-// ─── FLARES ─────────────────────────────────────────────────
-// NEW: distinct from health_events — the monthly-review route already
-// queried a separate 'flares' table, but getFullHistory never included it,
-// which is why the Dermatologist specialist had no flare data to work
-// from despite flares being logged. Added here so it flows through.
-
-export async function getAllFlares() {
-  const { data } = await supabase
-    .from('flares').select('*').order('start_date', { ascending: false })
-  return data ?? []
-}
-
-export async function getRecentFlares(sinceISO: string) {
-  const { data } = await supabase
-    .from('flares').select('*').gte('start_date', sinceISO)
-  return data ?? []
-}
-
 // ─── WEEKLY PHOTOS ────────────────────────────────────────────
 
 export async function getWeeklyPhotos(weekOf: string): Promise<WeeklyPhoto[]> {
@@ -335,8 +330,8 @@ export async function uploadWeeklyPhoto(
   return data
 }
 
-// NEW: most recent tongue photo at or before a given week — used by the
-// TCM Practitioner specialist so it actually sees the photo instead of
+// Most recent tongue photo at or before a given week — used by the TCM
+// Practitioner specialist so it actually sees the photo instead of
 // reasoning from lifestyle logs alone.
 export async function getLatestTonguePhoto(beforeOrOnWeekOf: string): Promise<WeeklyPhoto | null> {
   const { data } = await supabase
@@ -365,7 +360,7 @@ export async function getFullHistory(days = 90) {
   since.setDate(since.getDate() - days)
   const sinceISO = since.toISOString().split('T')[0]
 
-  const [logs, mentalStates, meals, exercise, recovery, supplements, healthEvents, periods, flares] =
+  const [logs, mentalStates, meals, exercise, recovery, supplements, healthEvents, periods] =
     await Promise.all([
       supabase.from('daily_logs').select('*').gte('log_date', sinceISO).order('log_date'),
       supabase.from('daily_mental_states').select('*').gte('log_date', sinceISO),
@@ -375,7 +370,6 @@ export async function getFullHistory(days = 90) {
       supabase.from('daily_supplements').select('*').gte('log_date', sinceISO),
       supabase.from('health_events').select('*').gte('start_date', sinceISO),
       supabase.from('periods').select('*').gte('start_date', sinceISO),
-      supabase.from('flares').select('*').gte('start_date', sinceISO),
     ])
 
   return {
@@ -387,6 +381,5 @@ export async function getFullHistory(days = 90) {
     supplements: supplements.data ?? [],
     healthEvents: healthEvents.data ?? [],
     periods: periods.data ?? [],
-    flares: flares.data ?? [],
   }
 }

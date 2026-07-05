@@ -279,25 +279,82 @@ export default function InsightsPage() {
           <>
             {healthBusy && <UpdatingBadge label="Updating insights…" />}
 
-            {!healthData.has_data ? (
+            {/* ── SPECIALIST TABS — rendered first, independent of whether
+                the consolidator has finished. Each specialist's data shows
+                as soon as IT completes, not gated behind the final
+                combined result. This is what was broken before: this
+                section used to live inside the has_data check below,
+                which stayed false (undefined, actually) for the entire
+                time the consolidator was still running, hiding specialist
+                data that had already arrived. ────────────────────── */}
+            {healthData.board && (
+              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                <div className="flex gap-1 overflow-x-auto px-3 pt-3 pb-1 border-b border-slate-100">
+                  {SPECIALIST_TABS.map((tab) => {
+                    const card = tab.key === 'lab' ? null : healthData.board?.[tab.key as keyof BoardSection]
+                    const dotStatus = tab.key === 'lab' ? bloodStatus : (card?.status ?? (card?.has_data ? 'success' : 'generating'))
+                    return (
+                      <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all
+                          ${activeTab === tab.key ? 'bg-blue-50 text-blue-700' : 'text-slate-500'}`}
+                      >
+                        <span>{tab.icon}</span>
+                        <span>{tab.label}</span>
+                        <StatusDot status={dotStatus} />
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="p-5">
+                  {SPECIALIST_TABS.filter((t) => t.key === activeTab).map((tab) => {
+                    if (tab.key === 'lab') {
+                      return <LabDetailsPanel key="lab" bloodData={bloodData} bloodBusy={bloodBusy} bloodStatus={bloodStatus} onRetry={loadBlood} />
+                    }
+                    const card = healthData.board?.[tab.key as keyof BoardSection]
+                    if (!card) return <p key={tab.key} className="text-xs text-slate-400">Not started yet.</p>
+                    if (card.status === 'generating' || (!card.has_data && !card.error)) {
+                      return (
+                        <div key={tab.key} className="flex items-center gap-2 py-4">
+                          <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                          <p className="text-xs text-slate-400">Still working on this one…</p>
+                        </div>
+                      )
+                    }
+                    if (card.has_data === false) {
+                      return <p key={tab.key} className="text-xs text-slate-400">Hit a snag — will retry on the next refresh.</p>
+                    }
+                    return <SpecialistFields key={tab.key} card={card} />
+                  })}
+                </div>
+              </div>
+            )}
+
+            {!healthData.board && !healthData.summary ? (
               <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-8 text-center">
                 <p className="text-4xl mb-3">📊</p>
-                <p className="font-medium text-slate-700">{healthData.summary}</p>
+                <p className="font-medium text-slate-700">
+                  {healthData.summary ?? 'Getting started — check back in a moment.'}
+                </p>
               </div>
             ) : (
               <>
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-5">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-lg">📅</span>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-white
-                      bg-blue-600 px-2 py-0.5 rounded-full">
-                      {PERIODS.find((p) => p.key === period)?.label}
-                    </span>
+                {healthData.summary && (
+                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-lg">📅</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-white
+                        bg-blue-600 px-2 py-0.5 rounded-full">
+                        {PERIODS.find((p) => p.key === period)?.label}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      <BoldText text={healthData.summary} />
+                    </p>
                   </div>
-                  <p className="text-sm text-slate-700 leading-relaxed">
-                    {healthData.summary && <BoldText text={healthData.summary} />}
-                  </p>
-                </div>
+                )}
 
                 {(healthData.biggest_change || healthData.what_deserves_attention_this_week) && (
                   <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-5 space-y-4">
@@ -384,50 +441,6 @@ export default function InsightsPage() {
                 {healthData.questions_worth_exploring_with_your_doctor && healthData.questions_worth_exploring_with_your_doctor.length > 0 && (
                   <ListCard icon="👩‍⚕️" title="Questions for Your Doctor" items={healthData.questions_worth_exploring_with_your_doctor} />
                 )}
-
-                {/* ── SPECIALIST TABS ─────────────────────────── */}
-                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                  <div className="flex gap-1 overflow-x-auto px-3 pt-3 pb-1 border-b border-slate-100">
-                    {SPECIALIST_TABS.map((tab) => {
-                      const card = tab.key === 'lab' ? null : healthData.board?.[tab.key as keyof BoardSection]
-                      const dotStatus = tab.key === 'lab' ? bloodStatus : (card?.status ?? (card?.has_data ? 'success' : 'generating'))
-                      return (
-                        <button
-                          key={tab.key}
-                          onClick={() => setActiveTab(tab.key)}
-                          className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all
-                            ${activeTab === tab.key ? 'bg-blue-50 text-blue-700' : 'text-slate-500'}`}
-                        >
-                          <span>{tab.icon}</span>
-                          <span>{tab.label}</span>
-                          <StatusDot status={dotStatus} />
-                        </button>
-                      )
-                    })}
-                  </div>
-
-                  <div className="p-5">
-                    {SPECIALIST_TABS.filter((t) => t.key === activeTab).map((tab) => {
-                      if (tab.key === 'lab') {
-                        return <LabDetailsPanel key="lab" bloodData={bloodData} bloodBusy={bloodBusy} bloodStatus={bloodStatus} onRetry={loadBlood} />
-                      }
-                      const card = healthData.board?.[tab.key as keyof BoardSection]
-                      if (!card) return <p key={tab.key} className="text-xs text-slate-400">Not started yet.</p>
-                      if (card.status === 'generating' || (!card.has_data && !card.error)) {
-                        return (
-                          <div key={tab.key} className="flex items-center gap-2 py-4">
-                            <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                            <p className="text-xs text-slate-400">Still working on this one…</p>
-                          </div>
-                        )
-                      }
-                      if (card.has_data === false) {
-                        return <p key={tab.key} className="text-xs text-slate-400">Hit a snag — will retry on the next refresh.</p>
-                      }
-                      return <SpecialistFields key={tab.key} card={card} />
-                    })}
-                  </div>
-                </div>
               </>
             )}
           </>

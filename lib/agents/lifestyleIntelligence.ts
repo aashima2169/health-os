@@ -11,6 +11,9 @@ import { regenerateHealthIntelligence } from './healthIntelligence'
 import { SPECIALIST_AGENT_IDS } from './specialistBoard'
 import { Period, daysForPeriod } from '../date'
 
+// In-process lock, keyed by period — same reasoning as healthIntelligence.ts.
+const inFlight = new Map<string, Promise<Record<string, any>>>()
+
 export async function analyzeLifestyleIntelligence(period: Period = 'month'): Promise<Record<string, any>> {
   const days = daysForPeriod(period)
   const history = await getFullHistory(days)
@@ -52,8 +55,19 @@ export async function analyzeLifestyleIntelligence(period: Period = 'month'): Pr
 // immediately so a concurrent poll sees progress and a second trigger
 // doesn't fire redundantly while this one is in flight.
 export async function regenerateLifestyleIntelligence(period: Period = 'month'): Promise<Record<string, any>> {
-  await markGenerating('A2', period)
+  const existing = inFlight.get(period)
+  if (existing) return existing
+
+  const run = regenerateLifestyleIntelligenceInner(period).finally(() => {
+    inFlight.delete(period)
+  })
+  inFlight.set(period, run)
+  return run
+}
+
+async function regenerateLifestyleIntelligenceInner(period: Period): Promise<Record<string, any>> {
   try {
+    await markGenerating('A2', period)
     const result = await analyzeLifestyleIntelligence(period)
     await saveAgentResult('A2', result, { period, version: LIFESTYLE_INTELLIGENCE_VERSION })
 

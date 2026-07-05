@@ -9,9 +9,39 @@ import { analyzeBloodIntelligence } from './bloodIntelligence'
 import { getAgentResult, saveAgentResult, markGenerating, invalidateAgents } from './store'
 import { Period } from '../date'
 
+// In-process lock: prevents two concurrent regenerations for the same
+// period from racing each other. This was the real cause of "weekly and
+// monthly both missing from the DB" after rapid tab-switching — the route
+// checks the DB to decide whether to trigger a new regeneration, but that
+// check-then-trigger isn't atomic. If a second trigger lands before the
+// first one's 'generating' marker is even written, both fire, and
+// whichever finishes LAST wins the final write — even if it's the one
+// that failed, clobbering the other's success. Keying by period here
+// means any duplicate trigger just awaits the SAME in-flight run instead
+// of starting a second one.
+const inFlight = new Map<string, Promise<Record<string, any>>>()
+
 export async function regenerateHealthIntelligence(period: Period = 'month', opts: { force?: boolean } = {}): Promise<Record<string, any>> {
-  await markGenerating('A3', period)
+  const existing = inFlight.get(period)
+  if (existing) return existing
+
+  const run = regenerateHealthIntelligenceInner(period, opts).finally(() => {
+    inFlight.delete(period)
+  })
+  inFlight.set(period, run)
+  return run
+}
+
+async function regenerateHealthIntelligenceInner(period: Period, opts: { force?: boolean } = {}): Promise<Record<string, any>> {
   try {
+    // Moved inside try: if markGenerating itself fails (e.g. a transient
+    // Supabase error), this used to throw BEFORE the try block, meaning
+    // nothing ever got written for this (agent, period) — the row was
+    // simply absent from the DB with no trace, which is exactly what was
+    // seen when switching periods rapidly. Now any failure here is caught
+    // below and an 'error' row is written instead of nothing at all.
+    await markGenerating('A3', period)
+
     if (opts.force) {
       // Manual "Refresh" — bypass the specialist cache for this period so
       // it's a genuinely fresh run, not a reuse of a prior success.
@@ -47,7 +77,7 @@ export async function regenerateHealthIntelligence(period: Period = 'month', opt
       userParts: [
         {
           type: 'text',
-          text: `Consolidate these five independent specialist reviews for the period: ${period.replace('_', ' ')}. Each specialist reviewed the data separately and did not see the others' notes.
+          text: `Consolidate these six independent specialist reviews for the period: ${period.replace('_', ' ')}. Each specialist reviewed the data separately and did not see the others' notes.
 
 Physician:
 ${JSON.stringify(board.physician, null, 2)}
@@ -60,6 +90,9 @@ ${JSON.stringify(board.psychologist, null, 2)}
 
 Gut Microbiome Doctor:
 ${JSON.stringify(board.gutMicrobiomeDoctor, null, 2)}
+
+Nutritionist:
+${JSON.stringify(board.nutritionist, null, 2)}
 
 TCM Practitioner:
 ${JSON.stringify(board.tcmPractitioner, null, 2)}

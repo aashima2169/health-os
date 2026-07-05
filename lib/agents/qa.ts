@@ -14,16 +14,32 @@ export interface SpecialistQA {
   created_at: string
 }
 
-// Called after a specialist successfully runs — upserts each new question
-// it asked. Uses ignoreDuplicates so an existing (agent_id, question) row
-// (and any answer already given) is left untouched.
+// Called after a specialist successfully runs — replaces its unanswered
+// questions with the new batch (capped to 2, matching the prompt's own
+// cap, but enforced here too so a model that ignores the instruction
+// can't flood the list). Answered questions are left untouched — their
+// value persists even if the specialist's newer run didn't re-ask them.
+// This fixes questions piling up indefinitely: previously each run's
+// slightly different wording created a new row instead of matching an
+// existing one, so the same underlying question (e.g. hair/nail symptoms)
+// could appear 5-6 times across runs.
 export async function upsertQuestions(agentId: string, questions: string[]) {
   if (!questions || questions.length === 0) return
-  const rows = questions
+  const capped = questions
     .filter((q) => typeof q === 'string' && q.trim().length > 0)
-    .map((q) => ({ agent_id: agentId, question: q.trim() }))
-  if (rows.length === 0) return
+    .slice(0, 2)
+  if (capped.length === 0) return
 
+  // Remove this agent's previously-asked-but-never-answered questions —
+  // they're being superseded by this run's batch. Answered ones stay.
+  const { error: deleteError } = await supabase
+    .from('specialist_qa')
+    .delete()
+    .eq('agent_id', agentId)
+    .is('answer', null)
+  if (deleteError) console.error(`[qa] cleanup for ${agentId} failed:`, deleteError)
+
+  const rows = capped.map((q) => ({ agent_id: agentId, question: q.trim() }))
   const { error } = await supabase
     .from('specialist_qa')
     .upsert(rows, { onConflict: 'agent_id,question', ignoreDuplicates: true })
