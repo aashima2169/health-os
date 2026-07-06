@@ -6,13 +6,10 @@
 import { getFullHistory } from '../db'
 import { callGeminiAgent } from './gemini'
 import { LIFESTYLE_INTELLIGENCE_PROMPT, LIFESTYLE_INTELLIGENCE_VERSION } from './prompts'
-import { getAgentResult, saveAgentResult, markGenerating, invalidateAgents } from './store'
+import { getAgentResult, saveAgentResult, claimGenerating, invalidateAgents } from './store'
 import { regenerateHealthIntelligence } from './healthIntelligence'
 import { SPECIALIST_AGENT_IDS } from './specialistBoard'
 import { Period, daysForPeriod } from '../date'
-
-// In-process lock, keyed by period — same reasoning as healthIntelligence.ts.
-const inFlight = new Map<string, Promise<Record<string, any>>>()
 
 export async function analyzeLifestyleIntelligence(period: Period = 'month'): Promise<Record<string, any>> {
   const days = daysForPeriod(period)
@@ -55,19 +52,13 @@ export async function analyzeLifestyleIntelligence(period: Period = 'month'): Pr
 // immediately so a concurrent poll sees progress and a second trigger
 // doesn't fire redundantly while this one is in flight.
 export async function regenerateLifestyleIntelligence(period: Period = 'month'): Promise<Record<string, any>> {
-  const existing = inFlight.get(period)
-  if (existing) return existing
+  const won = await claimGenerating('A2', period)
+  if (!won) {
+    const stored = await getAgentResult('A2', period)
+    return stored?.result ?? { agent_id: 'A2', period, has_data: false, status: 'generating' }
+  }
 
-  const run = regenerateLifestyleIntelligenceInner(period).finally(() => {
-    inFlight.delete(period)
-  })
-  inFlight.set(period, run)
-  return run
-}
-
-async function regenerateLifestyleIntelligenceInner(period: Period): Promise<Record<string, any>> {
   try {
-    await markGenerating('A2', period)
     const result = await analyzeLifestyleIntelligence(period)
     await saveAgentResult('A2', result, { period, version: LIFESTYLE_INTELLIGENCE_VERSION })
 

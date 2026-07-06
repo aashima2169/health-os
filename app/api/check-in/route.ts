@@ -1,8 +1,11 @@
 // app/api/check-in/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { saveCheckIn } from '../../../lib/db'
 import { regenerateLifestyleIntelligence } from '../../../lib/agents/lifestyleIntelligence'
 import type { CheckInPayload } from '../../../types'
+
+export const maxDuration = 280
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,11 +17,10 @@ export async function POST(req: NextRequest) {
 
     await saveCheckIn(payload)
 
-    // Fire-and-forget: the check-in save returns immediately, regeneration
-    // (A2 -> A3, ~90s+) happens in the background. The Insights page
-    // picks up the 'generating' status and polls until it's done.
-    regenerateLifestyleIntelligence().catch((err) =>
-      console.error('[check-in] A2 regeneration after save failed:', err),
+    waitUntil(
+      regenerateLifestyleIntelligence().catch((err) =>
+        console.error('[check-in] A2 regeneration after save failed:', err),
+      )
     )
 
     return NextResponse.json({ ok: true })

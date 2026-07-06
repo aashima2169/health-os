@@ -1,10 +1,12 @@
 // app/api/agents/blood-analysis/route.ts
 // A1: Blood Intelligence — reads the stored result. If nothing is stored
-// yet, kicks off generation in the background and returns immediately
-// with status 'generating' so the frontend can show a loader and poll
-// rather than blocking on a 15-30s response.
+// yet, kicks off generation via waitUntil (survives past this response)
+// and returns 'generating' immediately.
 import { NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { getStoredBloodIntelligence, regenerateBloodIntelligence } from '../../../../lib/agents/bloodIntelligence'
+
+export const maxDuration = 280
 
 export async function GET() {
   try {
@@ -17,8 +19,9 @@ export async function GET() {
       return NextResponse.json({ status: 'generating', generated_at: stored.generated_at })
     }
 
-    // Nothing stored yet at all — bootstrap in the background, don't block.
-    regenerateBloodIntelligence().catch((err) => console.error('[A1] bootstrap failed:', err))
+    waitUntil(
+      regenerateBloodIntelligence().catch((err) => console.error('[A1] bootstrap failed:', err))
+    )
     return NextResponse.json({ status: 'generating', generated_at: null })
   } catch (err) {
     console.error('[A1] error:', err)

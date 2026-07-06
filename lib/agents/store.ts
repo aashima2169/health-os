@@ -63,6 +63,33 @@ export async function markGenerating(agentId: AgentId, period = 'all') {
   await saveAgentResult(agentId, {}, { period, status: 'generating' })
 }
 
+// Atomically claims the right to regenerate (agentId, period). Returns
+// true if this call won the claim and should proceed; false if another
+// invocation already holds an active claim (staleSeconds controls how
+// long a claim is considered "active" before it's treated as abandoned —
+// e.g. from a crashed invocation — and reclaimable).
+//
+// This REPLACES in-memory locking (a JS Map/variable), which does not
+// work across Vercel serverless invocations — each invocation is an
+// isolated process with no shared memory, so two concurrent requests
+// could each think they're the only one running and race each other,
+// with whichever finishes last overwriting the other's result even if
+// that one failed. This uses a single atomic SQL statement instead
+// (INSERT ... ON CONFLICT DO UPDATE ... WHERE), which Postgres guarantees
+// only one concurrent caller can win, regardless of process boundaries.
+export async function claimGenerating(agentId: AgentId, period = 'all', staleSeconds = 360): Promise<boolean> {
+  const { data, error } = await supabase.rpc('claim_agent_generation', {
+    p_agent_id: agentId,
+    p_period: period,
+    p_stale_seconds: staleSeconds,
+  })
+  if (error) {
+    console.error(`[store] claimGenerating(${agentId}, ${period}) error:`, error)
+    return false
+  }
+  return data === true
+}
+
 // Deletes stored results for the given agents across ALL periods. Used
 // when underlying data changes (new blood report, new check-in) — the
 // specialist board's cached reads are no longer valid for any timeframe,

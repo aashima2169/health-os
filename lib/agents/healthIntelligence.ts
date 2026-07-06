@@ -6,42 +6,26 @@ import { callGeminiAgent } from './gemini'
 import { HEALTH_INTELLIGENCE_PROMPT, HEALTH_INTELLIGENCE_VERSION } from './prompts'
 import { runSpecialistBoard, SPECIALIST_AGENT_IDS } from './specialistBoard'
 import { analyzeBloodIntelligence } from './bloodIntelligence'
-import { getAgentResult, saveAgentResult, markGenerating, invalidateAgents } from './store'
+import { getAgentResult, saveAgentResult, claimGenerating, invalidateAgents } from './store'
 import { Period } from '../date'
 
-// In-process lock: prevents two concurrent regenerations for the same
-// period from racing each other. This was the real cause of "weekly and
-// monthly both missing from the DB" after rapid tab-switching — the route
-// checks the DB to decide whether to trigger a new regeneration, but that
-// check-then-trigger isn't atomic. If a second trigger lands before the
-// first one's 'generating' marker is even written, both fire, and
-// whichever finishes LAST wins the final write — even if it's the one
-// that failed, clobbering the other's success. Keying by period here
-// means any duplicate trigger just awaits the SAME in-flight run instead
-// of starting a second one.
-const inFlight = new Map<string, Promise<Record<string, any>>>()
-
 export async function regenerateHealthIntelligence(period: Period = 'month', opts: { force?: boolean } = {}): Promise<Record<string, any>> {
-  const existing = inFlight.get(period)
-  if (existing) return existing
+  // Atomic DB-level claim — replaces the old in-memory Map lock, which
+  // doesn't work on Vercel: each serverless invocation is an isolated
+  // process with no shared memory, so two concurrent requests (e.g. rapid
+  // tab-switching) could each think they're the only one running. This
+  // claim uses a single atomic Postgres statement, so only one caller
+  // ever wins it, regardless of how many separate invocations try at once.
+  const won = await claimGenerating('A3', period)
+  if (!won) {
+    // Someone else (another invocation) already has an active claim on
+    // this period. Don't start a duplicate regeneration — just return
+    // whatever's currently stored so the caller has something to show.
+    const stored = await getAgentResult('A3', period)
+    return stored?.result ?? { agent_id: 'A3', period, has_data: false, status: 'generating' }
+  }
 
-  const run = regenerateHealthIntelligenceInner(period, opts).finally(() => {
-    inFlight.delete(period)
-  })
-  inFlight.set(period, run)
-  return run
-}
-
-async function regenerateHealthIntelligenceInner(period: Period, opts: { force?: boolean } = {}): Promise<Record<string, any>> {
   try {
-    // Moved inside try: if markGenerating itself fails (e.g. a transient
-    // Supabase error), this used to throw BEFORE the try block, meaning
-    // nothing ever got written for this (agent, period) — the row was
-    // simply absent from the DB with no trace, which is exactly what was
-    // seen when switching periods rapidly. Now any failure here is caught
-    // below and an 'error' row is written instead of nothing at all.
-    await markGenerating('A3', period)
-
     if (opts.force) {
       // Manual "Refresh" — bypass the specialist cache for this period so
       // it's a genuinely fresh run, not a reuse of a prior success.

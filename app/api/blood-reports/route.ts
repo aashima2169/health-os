@@ -1,8 +1,11 @@
 // app/api/blood-reports/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { supabase } from '../../../lib/supabase'
 import { extractMarkersFromPDF } from '../../../lib/extractMarkers'
 import { regenerateBloodIntelligence } from '../../../lib/agents/bloodIntelligence'
+
+export const maxDuration = 280
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,13 +55,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Database insert failed' }, { status: 500 })
     }
 
-    // Event-driven regeneration: fire-and-forget so the upload response
-    // returns immediately rather than blocking ~90s for the full A1 -> A3
-    // regeneration chain. The Insights page picks up the 'generating'
-    // status and polls until it's done.
+    // waitUntil keeps this alive past the response — a bare fire-and-forget
+    // (.catch() without await, no waitUntil) gets killed by Vercel the
+    // instant this response is sent, so the regeneration would silently
+    // never complete.
     if (!extractionError) {
-      regenerateBloodIntelligence().catch((err) =>
-        console.error('[blood-reports] A1 regeneration after upload failed:', err),
+      waitUntil(
+        regenerateBloodIntelligence().catch((err) =>
+          console.error('[blood-reports] A1 regeneration after upload failed:', err),
+        )
       )
     }
 

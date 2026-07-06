@@ -1,10 +1,13 @@
 // app/api/agents/lifestyle-analysis/route.ts
 // A2: Lifestyle Intelligence — reads the stored result for the requested
-// period. If that period hasn't been generated yet, kicks off generation
-// in the background and returns 'generating' immediately.
+// period. If missing, kicks off generation via waitUntil and returns
+// 'generating' immediately.
 import { NextRequest, NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { getStoredLifestyleIntelligence, regenerateLifestyleIntelligence } from '../../../../lib/agents/lifestyleIntelligence'
 import { isValidPeriod, Period } from '../../../../lib/date'
+
+export const maxDuration = 280
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,7 +24,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ status: 'generating', period, generated_at: stored.generated_at })
     }
 
-    regenerateLifestyleIntelligence(period).catch((err) => console.error('[A2] bootstrap failed:', err))
+    waitUntil(
+      regenerateLifestyleIntelligence(period).catch((err) => console.error('[A2] bootstrap failed:', err))
+    )
     return NextResponse.json({ status: 'generating', period, generated_at: null })
   } catch (err) {
     console.error('[A2] error:', err)

@@ -6,14 +6,9 @@
 import { supabase } from '../supabase'
 import { callGeminiAgent } from './gemini'
 import { BLOOD_INTELLIGENCE_PROMPT, BLOOD_INTELLIGENCE_VERSION } from './prompts'
-import { getAgentResult, saveAgentResult, markGenerating, invalidateAgents } from './store'
+import { getAgentResult, saveAgentResult, claimGenerating, invalidateAgents } from './store'
 import { regenerateHealthIntelligence } from './healthIntelligence'
 import { SPECIALIST_AGENT_IDS } from './specialistBoard'
-
-// In-process lock — prevents two concurrent regenerations from racing and
-// the last-to-finish clobbering an earlier success. A1 has no period key,
-// so a single slot is enough (unlike A2/A3 which key by period).
-let inFlight: Promise<Record<string, any>> | null = null
 
 export async function analyzeBloodIntelligence(): Promise<Record<string, any>> {
   const { data: reports, error } = await supabase
@@ -71,18 +66,13 @@ ${reports.length > 2
 // instead of nothing, and to avoid a second redundant trigger firing
 // while this one is still in flight.
 export async function regenerateBloodIntelligence(): Promise<Record<string, any>> {
-  if (inFlight) return inFlight
+  const won = await claimGenerating('A1', 'all')
+  if (!won) {
+    const stored = await getAgentResult('A1', 'all')
+    return stored?.result ?? { agent_id: 'A1', has_data: false, status: 'generating' }
+  }
 
-  const run = regenerateBloodIntelligenceInner().finally(() => {
-    inFlight = null
-  })
-  inFlight = run
-  return run
-}
-
-async function regenerateBloodIntelligenceInner(): Promise<Record<string, any>> {
   try {
-    await markGenerating('A1', 'all')
     const result = await analyzeBloodIntelligence()
     await saveAgentResult('A1', result, { period: 'all', version: BLOOD_INTELLIGENCE_VERSION })
 
