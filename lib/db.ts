@@ -334,10 +334,16 @@ export async function uploadWeeklyPhoto(
 // Practitioner specialist so it actually sees the photo instead of
 // reasoning from lifestyle logs alone.
 export async function getLatestTonguePhoto(beforeOrOnWeekOf: string): Promise<WeeklyPhoto | null> {
+  return getLatestWeeklyPhotoByType('tongue', beforeOrOnWeekOf)
+}
+
+// Generic version — used by Dermatologist for acne/flare photos, same
+// pattern as the tongue photo fetch for TCM.
+export async function getLatestWeeklyPhotoByType(photoType: string, beforeOrOnWeekOf: string): Promise<WeeklyPhoto | null> {
   const { data } = await supabase
     .from('weekly_photos')
     .select('*')
-    .eq('photo_type', 'tongue')
+    .eq('photo_type', photoType)
     .lte('week_of', beforeOrOnWeekOf)
     .order('week_of', { ascending: false })
     .limit(1)

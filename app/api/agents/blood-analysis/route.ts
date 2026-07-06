@@ -15,10 +15,24 @@ export async function GET() {
     if (stored && stored.status === 'success') {
       return NextResponse.json({ ...stored.result, status: 'success', generated_at: stored.generated_at })
     }
-    if (stored && stored.status === 'generating') {
+
+    // A 'generating' status is only trustworthy if it's recent — if it's
+    // been sitting for a while, whatever process set it likely died
+    // (Vercel invocation killed, crash, etc.) without ever updating it.
+    // Previously this route trusted 'generating' forever, meaning a
+    // frozen row NEVER got retried by any future request — the atomic
+    // claim in regenerateBloodIntelligence() never even got invoked,
+    // correct or not, because the route bailed out before reaching it.
+    const STALE_MS = 6 * 60 * 1000
+    const isStale = stored?.generated_at && (Date.now() - new Date(stored.generated_at).getTime() > STALE_MS)
+
+    if (stored && stored.status === 'generating' && !isStale) {
       return NextResponse.json({ status: 'generating', generated_at: stored.generated_at })
     }
 
+    // Nothing stored, or stored-but-stale — try again. The atomic claim
+    // inside regenerateBloodIntelligence() safely handles the case where
+    // another request is genuinely, actively working on it right now.
     waitUntil(
       regenerateBloodIntelligence().catch((err) => console.error('[A1] bootstrap failed:', err))
     )

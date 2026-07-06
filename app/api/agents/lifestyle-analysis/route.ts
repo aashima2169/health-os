@@ -20,7 +20,14 @@ export async function GET(req: NextRequest) {
     if (stored && stored.status === 'success') {
       return NextResponse.json({ ...stored.result, status: 'success', generated_at: stored.generated_at })
     }
-    if (stored && stored.status === 'generating') {
+
+    // See blood-analysis/route.ts for why staleness matters here — a
+    // frozen 'generating' row must not be trusted forever, or it never
+    // gets retried by any future request.
+    const STALE_MS = 6 * 60 * 1000
+    const isStale = stored?.generated_at && (Date.now() - new Date(stored.generated_at).getTime() > STALE_MS)
+
+    if (stored && stored.status === 'generating' && !isStale) {
       return NextResponse.json({ status: 'generating', period, generated_at: stored.generated_at })
     }
 

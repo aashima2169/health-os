@@ -11,7 +11,7 @@
 // Gemini call is made. The cache is invalidated externally (see
 // bloodIntelligence.ts / lifestyleIntelligence.ts) whenever underlying
 // data actually changes.
-import { getFullHistory, getLatestTonguePhoto } from '../db'
+import { getFullHistory, getLatestWeeklyPhotoByType } from '../db'
 import { callGeminiAgent } from './gemini'
 import {
   PHYSICIAN_PROMPT, PHYSICIAN_VERSION,
@@ -90,18 +90,28 @@ async function runSpecialist(
 }
 
 export async function runPhysician(bloodResult: Record<string, any>, history: History, period: Period) {
-  return runSpecialist('A3a', period, PHYSICIAN_VERSION, PHYSICIAN_PROMPT, 'Blood Intelligence output and general daily logs', {
+  return runSpecialist('A3a', period, PHYSICIAN_VERSION, PHYSICIAN_PROMPT, 'Blood Intelligence output, general daily logs, and exercise/recovery logs', {
     blood_intelligence: bloodResult,
     daily_logs: history.logs,
+    exercise: history.exercise,
+    recovery: history.recovery,
   })
 }
 
 export async function runDermatologist(bloodResult: Record<string, any>, history: History, period: Period) {
-  return runSpecialist('A3b', period, DERMATOLOGIST_VERSION, DERMATOLOGIST_PROMPT, 'Logged health events (flares, etc.), meals, and Blood Intelligence output for context', {
-    blood_intelligence: bloodResult,
-    health_events: history.healthEvents,
-    meals: history.meals,
-  })
+  const skinPhotoParts = await fetchWeeklyPhotoParts(['acne', 'flare'])
+  const photoNote = skinPhotoParts.length > 0
+    ? `, and ${skinPhotoParts.length} skin photo(s) attached as images`
+    : ' — no skin photos are available for this pass'
+  return runSpecialist(
+    'A3b', period, DERMATOLOGIST_VERSION, DERMATOLOGIST_PROMPT,
+    `Logged health events (flares, etc.), and Blood Intelligence output for context${photoNote}`,
+    {
+      blood_intelligence: bloodResult,
+      health_events: history.healthEvents,
+    },
+    skinPhotoParts,
+  )
 }
 
 export async function runPsychologist(bloodResult: Record<string, any>, history: History, period: Period) {
@@ -131,38 +141,45 @@ export async function runNutritionist(bloodResult: Record<string, any>, history:
   })
 }
 
-// Fetches the most recent tongue photo (if any) and downloads it as base64
-// so the TCM specialist can examine it directly as an image, not just
-// reason about it secondhand.
-async function fetchTonguePhotoPart(): Promise<GeminiPart[]> {
-  try {
-    const currentWeek = mondayOfWeek()
-    const photo = await getLatestTonguePhoto(currentWeek)
-    if (!photo?.photo_url) return []
+// Fetches the most recent photo(s) of the given type(s) and downloads them
+// as base64 so a specialist can examine them directly as images, not just
+// reason about them secondhand. Generic version of what TCM already used
+// for tongue photos — now also used by Dermatologist for acne/flare.
+async function fetchWeeklyPhotoParts(photoTypes: string[]): Promise<GeminiPart[]> {
+  const currentWeek = mondayOfWeek()
+  const parts: GeminiPart[] = []
 
-    const res = await fetch(photo.photo_url)
-    if (!res.ok) return []
-    const buffer = await res.arrayBuffer()
-    const base64 = Buffer.from(buffer).toString('base64')
-    const mimeType = res.headers.get('content-type') || 'image/jpeg'
+  for (const photoType of photoTypes) {
+    try {
+      const photo = await getLatestWeeklyPhotoByType(photoType, currentWeek)
+      if (!photo?.photo_url) continue
 
-    return [{ type: 'image', base64, mimeType }]
-  } catch (err) {
-    console.error('[A3e] failed to fetch tongue photo, proceeding without it:', err)
-    return []
+      const res = await fetch(photo.photo_url)
+      if (!res.ok) continue
+      const buffer = await res.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
+      const mimeType = res.headers.get('content-type') || 'image/jpeg'
+
+      parts.push({ type: 'image', base64, mimeType })
+    } catch (err) {
+      console.error(`[photo fetch] failed to fetch ${photoType} photo, proceeding without it:`, err)
+    }
   }
+
+  return parts
 }
 
 export async function runTcmPractitioner(bloodResult: Record<string, any>, history: History, period: Period) {
-  const tonguePart = await fetchTonguePhotoPart()
+  const tonguePart = await fetchWeeklyPhotoParts(['tongue'])
   return runSpecialist(
     'A3e', period, TCM_PRACTITIONER_VERSION, TCM_PRACTITIONER_PROMPT,
-    `Daily logs, mental states, periods, Blood Intelligence output for context${tonguePart.length ? ', and a tongue photo (attached as an image)' : ' — no tongue photo is available for this pass'}`,
+    `Daily logs, mental states, periods, exercise logs, Blood Intelligence output for context${tonguePart.length ? ', and a tongue photo (attached as an image)' : ' — no tongue photo is available for this pass'}`,
     {
       blood_intelligence: bloodResult,
       daily_logs: history.logs,
       mental_states: history.mentalStates,
       periods: history.periods,
+      exercise: history.exercise,
     },
     tonguePart,
   )
