@@ -205,6 +205,27 @@ export default function InsightsPage() {
     }
   }
 
+  // The actual "Refresh" action. loadHealth/loadBlood only ever GET — if a
+  // 'success' result is already cached, GET correctly trusts it and skips
+  // regenerating, which means a plain reload can NEVER force a fresh run.
+  // This calls the force-regenerate POST endpoints first, then starts
+  // polling via the normal GET/poll cycle to reflect progress.
+  async function forceRefresh() {
+    setHealthStatus('generating')
+    setBloodStatus('generating')
+    try {
+      await Promise.all([
+        fetch(`/api/agents/health-intelligence?period=${period}`, { method: 'POST' }),
+        fetch('/api/agents/blood-analysis', { method: 'POST' }),
+      ])
+    } catch {
+      // even if the POST itself fails to reach the server, still poll —
+      // the GET routes have their own staleness/bootstrap fallback
+    }
+    loadHealth(period)
+    loadBlood()
+  }
+
   async function saveAnswer(q: SpecialistQuestion) {
     const draft = drafts[q.id]
     if (draft === undefined || draft.trim() === '') return
@@ -247,7 +268,7 @@ export default function InsightsPage() {
           <h1 className="text-3xl font-bold text-slate-900">Your Patterns</h1>
         </div>
         <button
-          onClick={() => { loadHealth(period); loadBlood() }}
+          onClick={forceRefresh}
           disabled={healthBusy && bloodBusy}
           className="text-sm text-blue-600 font-medium disabled:opacity-50"
         >

@@ -351,6 +351,23 @@ export async function getLatestWeeklyPhotoByType(photoType: string, beforeOrOnWe
   return data
 }
 
+// No week-boundary ceiling at all — just the single most recent photo of
+// this type, period. The "beforeOrOnWeekOf" ceiling on the function above
+// is a likely source of silent exclusion bugs (server-computed "current
+// week" via timezone-sensitive date math not matching when/how a photo
+// was actually uploaded), and for a specialist that just wants the latest
+// available photo, that ceiling adds risk without real benefit.
+export async function getMostRecentWeeklyPhotoByType(photoType: string): Promise<WeeklyPhoto | null> {
+  const { data } = await supabase
+    .from('weekly_photos')
+    .select('*')
+    .eq('photo_type', photoType)
+    .order('week_of', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  return data
+}
+
 // ─── BLOOD REPORTS ────────────────────────────────────────────
 
 export async function getAllBloodReports(): Promise<BloodReport[]> {

@@ -42,3 +42,20 @@ export async function GET() {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }
+
+// Manual "regenerate now" trigger — this is what the Refresh button should
+// call. The GET route above correctly trusts a 'success' cached result and
+// returns it immediately, which means a plain page reload can never force
+// a fresh run once something's cached. This is the only path that
+// actually forces regeneration regardless of what's currently stored.
+export async function POST() {
+  try {
+    waitUntil(
+      regenerateBloodIntelligence().catch((err) => console.error('[A1] manual regenerate failed:', err))
+    )
+    return NextResponse.json({ status: 'generating' })
+  } catch (err) {
+    console.error('[A1] manual regenerate error:', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
+}

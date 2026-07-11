@@ -11,7 +11,7 @@
 // Gemini call is made. The cache is invalidated externally (see
 // bloodIntelligence.ts / lifestyleIntelligence.ts) whenever underlying
 // data actually changes.
-import { getFullHistory, getLatestWeeklyPhotoByType } from '../db'
+import { getFullHistory, getMostRecentWeeklyPhotoByType } from '../db'
 import { callGeminiAgent } from './gemini'
 import {
   PHYSICIAN_PROMPT, PHYSICIAN_VERSION,
@@ -22,7 +22,7 @@ import {
   TCM_PRACTITIONER_PROMPT, TCM_PRACTITIONER_VERSION,
 } from './prompts'
 import { AgentId, getAgentResult, saveAgentResult, markGenerating } from './store'
-import { Period, daysForPeriod, mondayOfWeek } from '../date'
+import { Period, daysForPeriod } from '../date'
 import { getQuestionsForAgent, upsertQuestions } from './qa'
 
 export const SPECIALIST_AGENT_IDS: AgentId[] = ['A3a', 'A3b', 'A3c', 'A3d', 'A3e', 'A3f']
@@ -115,11 +115,12 @@ export async function runDermatologist(bloodResult: Record<string, any>, history
 }
 
 export async function runPsychologist(bloodResult: Record<string, any>, history: History, period: Period) {
-  return runSpecialist('A3c', period, PSYCHOLOGIST_VERSION, PSYCHOLOGIST_PROMPT, 'Mental states, daily logs (including written reflections), and Blood Intelligence output for context', {
+  return runSpecialist('A3c', period, PSYCHOLOGIST_VERSION, PSYCHOLOGIST_PROMPT, 'Mental states, daily logs (including written reflections), menstrual cycle data, and Blood Intelligence output for context', {
     blood_intelligence: bloodResult,
     mental_states: history.mentalStates,
     daily_logs: history.logs,
     recovery: history.recovery,
+    periods: history.periods,
   })
 }
 
@@ -132,12 +133,19 @@ export async function runGutMicrobiomeDoctor(bloodResult: Record<string, any>, h
   })
 }
 
+// Hardcoded until a proper user-profile/settings table exists — this is a
+// single-user app currently, so a fixed constant is pragmatic for now, but
+// this should move to a real settings field if the app ever supports more
+// than one person.
+const USER_HEIGHT_CM = 163 // 5'4"
+
 export async function runNutritionist(bloodResult: Record<string, any>, history: History, period: Period) {
-  return runSpecialist('A3f', period, NUTRITIONIST_VERSION, NUTRITIONIST_PROMPT, 'Meals, supplements, daily logs (including weight), and Blood Intelligence output for context', {
+  return runSpecialist('A3f', period, NUTRITIONIST_VERSION, NUTRITIONIST_PROMPT, 'Meals, supplements, daily logs (including weight), height, and Blood Intelligence output for context', {
     blood_intelligence: bloodResult,
     meals: history.meals,
     supplements: history.supplements,
     daily_logs: history.logs,
+    height_cm: USER_HEIGHT_CM,
   })
 }
 
@@ -145,24 +153,33 @@ export async function runNutritionist(bloodResult: Record<string, any>, history:
 // as base64 so a specialist can examine them directly as images, not just
 // reason about them secondhand. Generic version of what TCM already used
 // for tongue photos — now also used by Dermatologist for acne/flare.
+// Logs each step clearly so a failure is diagnosable from Vercel logs
+// instead of silently just not attaching a photo with no trace of why.
 async function fetchWeeklyPhotoParts(photoTypes: string[]): Promise<GeminiPart[]> {
-  const currentWeek = mondayOfWeek()
   const parts: GeminiPart[] = []
 
   for (const photoType of photoTypes) {
     try {
-      const photo = await getLatestWeeklyPhotoByType(photoType, currentWeek)
-      if (!photo?.photo_url) continue
+      const photo = await getMostRecentWeeklyPhotoByType(photoType)
+      if (!photo?.photo_url) {
+        console.warn(`[photo fetch] no '${photoType}' photo row found in weekly_photos at all`)
+        continue
+      }
+      console.log(`[photo fetch] found '${photoType}' photo: week_of=${photo.week_of}, url=${photo.photo_url}`)
 
       const res = await fetch(photo.photo_url)
-      if (!res.ok) continue
+      if (!res.ok) {
+        console.warn(`[photo fetch] '${photoType}' photo row exists but download failed: HTTP ${res.status} for ${photo.photo_url}`)
+        continue
+      }
       const buffer = await res.arrayBuffer()
       const base64 = Buffer.from(buffer).toString('base64')
       const mimeType = res.headers.get('content-type') || 'image/jpeg'
+      console.log(`[photo fetch] '${photoType}' photo downloaded successfully: ${buffer.byteLength} bytes, ${mimeType}`)
 
       parts.push({ type: 'image', base64, mimeType })
     } catch (err) {
-      console.error(`[photo fetch] failed to fetch ${photoType} photo, proceeding without it:`, err)
+      console.error(`[photo fetch] exception fetching '${photoType}' photo, proceeding without it:`, err)
     }
   }
 
