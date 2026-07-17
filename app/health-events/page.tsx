@@ -59,7 +59,7 @@ export default function HealthEventsPage() {
             className={`flex-1 h-10 rounded-xl text-xs font-semibold transition-all whitespace-nowrap px-2
               ${tab === 'blood' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500'}`}
           >
-            🩸 Blood
+            🩸 Lab Reports
           </button>
         </div>
       </div>
@@ -82,6 +82,7 @@ function EventsTab() {
   const [bodyLocations, setBodyLocations] = useState<string[]>([])
   const [loading, setLoading]         = useState(true)
   const [showForm, setShowForm]       = useState(false)
+  const [editingId, setEditingId]     = useState<string | null>(null)
 
   const [eventType, setEventType]     = useState('')
   const [customType, setCustomType]   = useState('')
@@ -106,7 +107,22 @@ function EventsTab() {
   const resetForm = () => {
     setEventType(''); setCustomType(''); setStartDate(''); setEndDate('')
     setSeverity(null); setStatus('new'); setBodyLocation(''); setNotes('')
+    setEditingId(null)
     setShowForm(false)
+  }
+
+  const handleEdit = (event: HealthEvent) => {
+    const isKnownType = eventTypes.includes(event.event_type)
+    setEditingId(event.id)
+    setEventType(isKnownType ? event.event_type : 'custom')
+    setCustomType(isKnownType ? '' : event.event_type)
+    setStartDate(event.start_date)
+    setEndDate(event.end_date ?? '')
+    setSeverity(event.severity)
+    setStatus(event.status)
+    setBodyLocation(event.body_location ?? '')
+    setNotes(event.notes ?? '')
+    setShowForm(true)
   }
 
   const handleSave = async () => {
@@ -115,11 +131,19 @@ function EventsTab() {
     const type = eventType === 'custom' ? customType : eventType
     try {
       const { data } = await upsertHealthEvent({
+        ...(editingId ? { id: editingId } : {}),
         event_type: type, start_date: startDate, end_date: endDate || null,
         severity, status, body_location: bodyLocation || null, notes: notes || null,
       }) as any
       setEvents((prev) => [data, ...prev.filter((e) => e.id !== data.id)])
       resetForm()
+
+      // A new or edited flare (e.g. an end date just set) is exactly what
+      // Signals' flare-anchored analysis is waiting on — worth a fresh
+      // pass without making the user remember to hit Refresh themselves.
+      // Fire-and-forget: the existing claimGenerating lock in
+      // regenerateSignals already prevents duplicate concurrent runs.
+      fetch('/api/agents/signals', { method: 'POST' }).catch(() => {})
     } finally {
       setSaving(false)
     }
@@ -136,7 +160,7 @@ function EventsTab() {
   return (
     <div className="px-4 space-y-3">
       <button
-        onClick={() => setShowForm((s) => !s)}
+        onClick={() => (showForm ? resetForm() : setShowForm(true))}
         className="w-full h-12 rounded-2xl border-2 border-dashed border-blue-200
           text-blue-600 text-sm font-semibold flex items-center justify-center gap-2"
       >
@@ -148,7 +172,9 @@ function EventsTab() {
 
       {showForm && (
         <div className="bg-white rounded-2xl border border-blue-100 shadow-sm px-5 py-5">
-          <p className="font-semibold text-slate-900 mb-4">Log Health Event</p>
+          <p className="font-semibold text-slate-900 mb-4">
+            {editingId ? 'Edit Health Event' : 'Log Health Event'}
+          </p>
 
           <div className="mb-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
@@ -244,7 +270,7 @@ function EventsTab() {
             </button>
             <button onClick={handleSave} disabled={saving || !startDate}
               className="flex-1 h-12 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-50">
-              {saving ? 'Saving…' : 'Save Event'}
+              {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Save Event'}
             </button>
           </div>
         </div>
@@ -262,14 +288,19 @@ function EventsTab() {
         </div>
       ) : (
         events.map((event) => (
-          <EventCard key={event.id} event={event} onDelete={() => handleDelete(event.id)} />
+          <EventCard
+            key={event.id}
+            event={event}
+            onEdit={() => handleEdit(event)}
+            onDelete={() => handleDelete(event.id)}
+          />
         ))
       )}
     </div>
   )
 }
 
-function EventCard({ event, onDelete }: { event: HealthEvent; onDelete: () => void }) {
+function EventCard({ event, onEdit, onDelete }: { event: HealthEvent; onEdit: () => void; onDelete: () => void }) {
   const [expanded, setExpanded] = useState(true)   // open by default so photo upload is visible immediately
   const fileRef = useRef<HTMLInputElement>(null)
   const [photos, setPhotos] = useState<HealthEventPhoto[]>([])
@@ -373,9 +404,14 @@ function EventCard({ event, onDelete }: { event: HealthEvent; onDelete: () => vo
             </div>
           </div>
 
-          <button onClick={onDelete} className="text-xs text-red-400 font-medium pt-1">
-            Delete event
-          </button>
+          <div className="flex gap-4 pt-1">
+            <button onClick={onEdit} className="text-xs text-blue-600 font-medium">
+              Edit event
+            </button>
+            <button onClick={onDelete} className="text-xs text-red-400 font-medium">
+              Delete event
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -414,6 +450,10 @@ function PeriodsTab() {
       if (!endDate) setActive(data)
       setShowForm(false)
       setStartDate(''); setEndDate('')
+
+      // New period logged — worth a fresh Signals pass, same reasoning as
+      // the flare trigger in EventsTab above.
+      fetch('/api/agents/signals', { method: 'POST' }).catch(() => {})
     } finally {
       setSaving(false)
     }
@@ -605,6 +645,12 @@ function PhotosTab() {
       const p = await uploadWeeklyPhoto(selectedWeek, type, file)
       setPhotos((prev) => [...prev.filter((x) => x.photo_type !== type), p])
       if (!allWeeks.includes(selectedWeek)) setAllWeeks((prev) => [selectedWeek, ...prev])
+
+      // A fresh tongue reading is worth a scoped TCM refresh (cascades
+      // into Signals) rather than waiting for a manual board Refresh.
+      if (type === 'tongue') {
+        fetch('/api/agents/tcm-refresh', { method: 'POST' }).catch(() => {})
+      }
     } finally {
       setUploading(null)
     }

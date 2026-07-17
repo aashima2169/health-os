@@ -15,6 +15,8 @@
 //   3. Only throw if repair also fails.
 
 import { jsonrepair } from 'jsonrepair'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { logGeminiCall } from '../tokenLog'
 
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent'
@@ -69,6 +71,7 @@ interface DocPart    { type: 'document'; base64: string; mimeType: 'application/
 type GeminiPart = TextPart | ImagePart | DocPart
 
 interface CallOptions {
+  client: SupabaseClient   // request-scoped — needed to log token usage server-side
   agentId: string
   promptVersion?: string   // optional — kept for logging/traceability only
   systemPrompt: string
@@ -179,6 +182,12 @@ export async function callGeminiAgent<T>(opts: CallOptions): Promise<T> {
    const finishReason = data.candidates?.[0]?.finishReason
 
 const usage = data.usageMetadata ?? {}
+
+logGeminiCall(opts.client, opts.agentId, {
+  input: usage.promptTokenCount ?? 0,
+  output: usage.candidatesTokenCount ?? 0,
+  total: usage.totalTokenCount ?? 0,
+}, latency).catch(() => {})
 
 console.log(`
 ====================================================

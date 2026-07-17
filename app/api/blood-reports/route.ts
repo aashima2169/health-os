@@ -1,9 +1,9 @@
 // app/api/blood-reports/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { waitUntil } from '@vercel/functions'
-import { supabase } from '../../../lib/supabase'
 import { extractMarkersFromPDF } from '../../../lib/extractMarkers'
-import { regenerateBloodIntelligence } from '../../../lib/agents/bloodIntelligence'
+import { invalidateAgents } from '../../../lib/agents/store'
+import { SPECIALIST_AGENT_IDS } from '../../../lib/agents/specialistBoard'
+import { createRequestClient } from '../../../lib/supabaseServer'
 
 export const maxDuration = 280
 
@@ -18,10 +18,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'file and report_date are required' }, { status: 400 })
     }
 
+    const client = await createRequestClient()
+
     const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`
     const fileBuffer = await file.arrayBuffer()
 
-    const { data: storageData, error: storageError } = await supabase.storage
+    const { data: storageData, error: storageError } = await client.storage
       .from('blood-reports')
       .upload(fileName, fileBuffer, { contentType: 'application/pdf' })
 
@@ -30,14 +32,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File upload failed' }, { status: 500 })
     }
 
-    const { data: urlData } = supabase.storage
+    const { data: urlData } = client.storage
       .from('blood-reports').getPublicUrl(storageData.path)
     const fileUrl = urlData.publicUrl
 
     const base64PDF = Buffer.from(fileBuffer).toString('base64')
-    const { markers, extractionError } = await extractMarkersFromPDF(base64PDF)
+    const { markers, extractionError } = await extractMarkersFromPDF(base64PDF, client)
 
-    const { data: report, error: dbError } = await supabase
+    const { data: report, error: dbError } = await client
       .from('blood_reports')
       .insert({
         report_date: reportDate,
@@ -55,16 +57,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Database insert failed' }, { status: 500 })
     }
 
-    // waitUntil keeps this alive past the response — a bare fire-and-forget
-    // (.catch() without await, no waitUntil) gets killed by Vercel the
-    // instant this response is sent, so the regeneration would silently
-    // never complete.
+    // AI analysis is fully manual now — Refresh on Insights is the only
+    // trigger. A new report still invalidates every cached read it could
+    // have affected, so the next Refresh recomputes from fresh data
+    // instead of reusing a now-stale cache; it just doesn't spend a Gemini
+    // call automatically on upload.
     if (!extractionError) {
-      waitUntil(
-        regenerateBloodIntelligence().catch((err) =>
-          console.error('[blood-reports] A1 regeneration after upload failed:', err),
-        )
-      )
+      await invalidateAgents(client, ['A1', ...SPECIALIST_AGENT_IDS, 'A3'])
     }
 
     return NextResponse.json({
@@ -81,7 +80,8 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
-    const { data, error } = await supabase
+    const client = await createRequestClient()
+    const { data, error } = await client
       .from('blood_reports').select('*').order('report_date', { ascending: false })
     if (error) throw error
     return NextResponse.json({ reports: data ?? [] })
@@ -95,11 +95,12 @@ export async function DELETE(req: NextRequest) {
   try {
     const { id, file_url } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
+    const client = await createRequestClient()
     if (file_url) {
       const path = file_url.split('/blood-reports/')[1]
-      if (path) await supabase.storage.from('blood-reports').remove([path])
+      if (path) await client.storage.from('blood-reports').remove([path])
     }
-    await supabase.from('blood_reports').delete().eq('id', id)
+    await client.from('blood_reports').delete().eq('id', id)
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[blood-reports DELETE] error:', err)

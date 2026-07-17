@@ -1,129 +1,131 @@
-// lib/db.ts — FULL FILE, REPLACE YOUR EXISTING lib/db.ts ENTIRELY WITH THIS
-// This consolidates every db function used across the app into one file
-// so there are no more cross-file import mismatches.
+// lib/db.ts
+// Every function takes an optional `client` as its last parameter,
+// defaulting to the browser singleton (lib/supabase.ts). Client pages call
+// these with no changes and get the correctly-session-bound browser client.
+// Server-side callers (API routes) pass a request-scoped client from
+// lib/supabaseServer.ts explicitly — required once RLS is enforcing
+// auth.uid() = user_id on every table.
 //
 // NOTE: flares are NOT a separate table — they're logged as health_events
 // (Events tab), already covered by getAllHealthEvents / getFullHistory's
-// healthEvents field. An earlier pass incorrectly added a query against a
-// 'flares' table that doesn't exist; reverted.
-//
-// ADDED: getLatestTonguePhoto for the TCM specialist (weekly_photos table,
-// photo_type = 'tongue', confirmed against the actual Photos tab schema).
+// healthEvents field.
 
 import { supabase } from './supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   DailyLog, Meal, MealSlot, MealLocation, DietState,
   Period, HealthEvent, HealthEventPhoto, WeeklyPhoto,
   BloodReport, MasterCategory, CheckInPayload,
+  Profile, ProfileCondition, Medication,
 } from '../types'
 
 // ─── MASTERS ──────────────────────────────────────────────────
 
-export async function getMasters(category: MasterCategory): Promise<string[]> {
-  const { data } = await supabase
+export async function getMasters(category: MasterCategory, client: SupabaseClient = supabase): Promise<string[]> {
+  const { data } = await client
     .from('masters').select('value').eq('category', category).order('sort_order')
   return (data ?? []).map((r) => r.value)
 }
 
-export async function addMaster(category: MasterCategory, value: string) {
-  const { data: ex } = await supabase
+export async function addMaster(category: MasterCategory, value: string, client: SupabaseClient = supabase) {
+  const { data: ex } = await client
     .from('masters').select('sort_order').eq('category', category)
     .order('sort_order', { ascending: false }).limit(1)
   const sort_order = ex && ex.length > 0 ? ex[0].sort_order + 1 : 1
-  return supabase.from('masters').insert({ category, value, sort_order, is_default: false })
+  return client.from('masters').insert({ category, value, sort_order, is_default: false })
 }
 
-export async function deleteMaster(category: MasterCategory, value: string) {
-  return supabase.from('masters').delete().eq('category', category).eq('value', value)
+export async function deleteMaster(category: MasterCategory, value: string, client: SupabaseClient = supabase) {
+  return client.from('masters').delete().eq('category', category).eq('value', value)
 }
 
 // ─── DAILY LOG ────────────────────────────────────────────────
 
-export async function getLog(date: string): Promise<DailyLog | null> {
-  const { data } = await supabase
+export async function getLog(date: string, client: SupabaseClient = supabase): Promise<DailyLog | null> {
+  const { data } = await client
     .from('daily_logs').select('*').eq('log_date', date).maybeSingle()
   return data
 }
 
-export async function getRecentLogs(days = 30): Promise<DailyLog[]> {
+export async function getRecentLogs(days = 30, client: SupabaseClient = supabase): Promise<DailyLog[]> {
   const since = new Date()
   since.setDate(since.getDate() - days)
-  const { data } = await supabase
+  const { data } = await client
     .from('daily_logs').select('*')
     .gte('log_date', since.toISOString().split('T')[0])
     .order('log_date', { ascending: false })
   return data ?? []
 }
 
-export async function upsertLog(payload: Partial<DailyLog> & { log_date: string }) {
-  return supabase
-    .from('daily_logs').upsert(payload, { onConflict: 'log_date' }).select().single()
+export async function upsertLog(payload: Partial<DailyLog> & { log_date: string }, client: SupabaseClient = supabase) {
+  return client
+    .from('daily_logs').upsert(payload, { onConflict: 'user_id,log_date' }).select().single()
 }
 
 // ─── MENTAL STATES ────────────────────────────────────────────
 
-export async function getMentalStates(date: string): Promise<string[]> {
-  const { data } = await supabase
+export async function getMentalStates(date: string, client: SupabaseClient = supabase): Promise<string[]> {
+  const { data } = await client
     .from('daily_mental_states').select('state').eq('log_date', date)
   return (data ?? []).map((r) => r.state)
 }
 
-export async function setMentalStates(date: string, states: string[]) {
-  await supabase.from('daily_mental_states').delete().eq('log_date', date)
+export async function setMentalStates(date: string, states: string[], client: SupabaseClient = supabase) {
+  await client.from('daily_mental_states').delete().eq('log_date', date)
   if (!states.length) return
-  return supabase.from('daily_mental_states')
+  return client.from('daily_mental_states')
     .insert(states.map((state) => ({ log_date: date, state })))
 }
 
 // ─── EXERCISE / MOVEMENT ──────────────────────────────────────
 
-export async function getExercise(date: string): Promise<string[]> {
-  const { data } = await supabase
+export async function getExercise(date: string, client: SupabaseClient = supabase): Promise<string[]> {
+  const { data } = await client
     .from('daily_exercise').select('exercise_type').eq('log_date', date)
   return (data ?? []).map((r) => r.exercise_type)
 }
 
-export async function setExercise(date: string, types: string[]) {
-  await supabase.from('daily_exercise').delete().eq('log_date', date)
+export async function setExercise(date: string, types: string[], client: SupabaseClient = supabase) {
+  await client.from('daily_exercise').delete().eq('log_date', date)
   if (!types.length) return
-  return supabase.from('daily_exercise')
+  return client.from('daily_exercise')
     .insert(types.map((exercise_type) => ({ log_date: date, exercise_type })))
 }
 
 // ─── RECOVERY ACTIVITIES ──────────────────────────────────────
 
-export async function getRecovery(date: string): Promise<string[]> {
-  const { data } = await supabase
+export async function getRecovery(date: string, client: SupabaseClient = supabase): Promise<string[]> {
+  const { data } = await client
     .from('daily_recovery').select('activity').eq('log_date', date)
   return (data ?? []).map((r) => r.activity)
 }
 
-export async function setRecovery(date: string, activities: string[]) {
-  await supabase.from('daily_recovery').delete().eq('log_date', date)
+export async function setRecovery(date: string, activities: string[], client: SupabaseClient = supabase) {
+  await client.from('daily_recovery').delete().eq('log_date', date)
   if (!activities.length) return
-  return supabase.from('daily_recovery')
+  return client.from('daily_recovery')
     .insert(activities.map((activity) => ({ log_date: date, activity })))
 }
 
 // ─── SUPPLEMENTS (daily taken) ─────────────────────────────────
 
-export async function getSupplements(date: string): Promise<string[]> {
-  const { data } = await supabase
+export async function getSupplements(date: string, client: SupabaseClient = supabase): Promise<string[]> {
+  const { data } = await client
     .from('daily_supplements').select('supplement').eq('log_date', date)
   return (data ?? []).map((r) => r.supplement)
 }
 
-export async function setSupplements(date: string, supplements: string[]) {
-  await supabase.from('daily_supplements').delete().eq('log_date', date)
+export async function setSupplements(date: string, supplements: string[], client: SupabaseClient = supabase) {
+  await client.from('daily_supplements').delete().eq('log_date', date)
   if (!supplements.length) return
-  return supabase.from('daily_supplements')
+  return client.from('daily_supplements')
     .insert(supplements.map((supplement) => ({ log_date: date, supplement })))
 }
 
 // ─── MEALS (daily diet entries) ────────────────────────────────
 
-export async function getMeals(date: string): Promise<Meal[]> {
-  const { data } = await supabase
+export async function getMeals(date: string, client: SupabaseClient = supabase): Promise<Meal[]> {
+  const { data } = await client
     .from('meals').select('*').eq('log_date', date).order('slot')
   return data ?? []
 }
@@ -143,7 +145,7 @@ export function mealsToDietState(meals: Meal[]): DietState {
   return state
 }
 
-export async function setMeals(date: string, diet: DietState) {
+export async function setMeals(date: string, diet: DietState, client: SupabaseClient = supabase) {
   const SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snacks']
   const rows = SLOTS.filter((s) => diet[s].description.trim()).map((slot) => ({
     log_date: date,
@@ -153,21 +155,19 @@ export async function setMeals(date: string, diet: DietState) {
       ? diet[slot].outside_reason : null,
     description: diet[slot].description.trim() || null,
   }))
-  await supabase.from('meals').delete().eq('log_date', date)
+  await client.from('meals').delete().eq('log_date', date)
   if (!rows.length) return
-  return supabase.from('meals').insert(rows)
+  return client.from('meals').insert(rows)
 }
 
-export async function getOutsideReasons(): Promise<string[]> {
-  return getMasters('outside_reason')
+export async function getOutsideReasons(client: SupabaseClient = supabase): Promise<string[]> {
+  return getMasters('outside_reason', client)
 }
 
 // ─── MEAL ITEMS (quick-add master list for Diet section) ──────
-// These were previously in a separate lib/db.meal-items.ts file.
-// They now live here so all imports resolve from '../../lib/db'.
 
-export async function getMealItems(slot: MealSlot): Promise<string[]> {
-  const { data } = await supabase
+export async function getMealItems(slot: MealSlot, client: SupabaseClient = supabase): Promise<string[]> {
+  const { data } = await client
     .from('meal_items')
     .select('item_name')
     .eq('slot', slot)
@@ -175,8 +175,8 @@ export async function getMealItems(slot: MealSlot): Promise<string[]> {
   return (data ?? []).map((r) => r.item_name)
 }
 
-export async function getAllMealItems(): Promise<Record<MealSlot, string[]>> {
-  const { data } = await supabase
+export async function getAllMealItems(client: SupabaseClient = supabase): Promise<Record<MealSlot, string[]>> {
+  const { data } = await client
     .from('meal_items')
     .select('slot, item_name')
     .order('sort_order')
@@ -190,8 +190,8 @@ export async function getAllMealItems(): Promise<Record<MealSlot, string[]>> {
   return result
 }
 
-export async function addMealItem(slot: MealSlot, itemName: string) {
-  const { data: existing } = await supabase
+export async function addMealItem(slot: MealSlot, itemName: string, client: SupabaseClient = supabase) {
+  const { data: existing } = await client
     .from('meal_items')
     .select('sort_order')
     .eq('slot', slot)
@@ -199,48 +199,48 @@ export async function addMealItem(slot: MealSlot, itemName: string) {
     .limit(1)
   const sort_order = existing && existing.length > 0 ? existing[0].sort_order + 1 : 1
 
-  return supabase.from('meal_items').insert({ slot, item_name: itemName, sort_order })
+  return client.from('meal_items').insert({ slot, item_name: itemName, sort_order })
 }
 
-export async function deleteMealItem(slot: MealSlot, itemName: string) {
-  return supabase.from('meal_items').delete().eq('slot', slot).eq('item_name', itemName)
+export async function deleteMealItem(slot: MealSlot, itemName: string, client: SupabaseClient = supabase) {
+  return client.from('meal_items').delete().eq('slot', slot).eq('item_name', itemName)
 }
 
 // ─── FULL CHECK-IN SAVE ───────────────────────────────────────
 
-export async function saveCheckIn(payload: CheckInPayload) {
+export async function saveCheckIn(payload: CheckInPayload, client: SupabaseClient = supabase) {
   const {
     log_date, weight_kg, sleep_hours, energy_level, brain_fog,
     watched_sunrise, watched_sunset, breathing, grounding_done,
     supplements_taken, reflection, notes,
     mental_states = [], exercise_types = [], recovery_activities = [], supplements = [],
   } = payload
- 
-  await supabase.from('daily_logs').upsert({
+
+  await client.from('daily_logs').upsert({
     log_date, weight_kg, sleep_hours, energy_level, brain_fog,
     watched_sunrise, watched_sunset, breathing, grounding_done,
     supplements_taken: supplements_taken ?? supplements.length > 0,
     reflection, notes,
-  }, { onConflict: 'log_date' })
- 
+  }, { onConflict: 'user_id,log_date' })
+
   await Promise.all([
-    setMentalStates(log_date, mental_states),
-    setExercise(log_date, exercise_types),
-    setRecovery(log_date, recovery_activities),
-    setSupplements(log_date, supplements),
+    setMentalStates(log_date, mental_states, client),
+    setExercise(log_date, exercise_types, client),
+    setRecovery(log_date, recovery_activities, client),
+    setSupplements(log_date, supplements, client),
   ])
 }
 
 // ─── PERIODS ──────────────────────────────────────────────────
 
-export async function getAllPeriods(): Promise<Period[]> {
-  const { data } = await supabase
+export async function getAllPeriods(client: SupabaseClient = supabase): Promise<Period[]> {
+  const { data } = await client
     .from('periods').select('*').order('start_date', { ascending: false })
   return data ?? []
 }
 
-export async function getActivePeriod(date: string): Promise<Period | null> {
-  const { data } = await supabase
+export async function getActivePeriod(date: string, client: SupabaseClient = supabase): Promise<Period | null> {
+  const { data } = await client
     .from('periods').select('*')
     .lte('start_date', date)
     .or(`end_date.is.null,end_date.gte.${date}`)
@@ -248,52 +248,52 @@ export async function getActivePeriod(date: string): Promise<Period | null> {
   return data
 }
 
-export async function upsertPeriod(period: Partial<Period> & { start_date: string }) {
-  return supabase.from('periods').upsert(period).select().single()
+export async function upsertPeriod(period: Partial<Period> & { start_date: string }, client: SupabaseClient = supabase) {
+  return client.from('periods').upsert(period).select().single()
 }
 
-export async function deletePeriod(id: string) {
-  return supabase.from('periods').delete().eq('id', id)
+export async function deletePeriod(id: string, client: SupabaseClient = supabase) {
+  return client.from('periods').delete().eq('id', id)
 }
 
 // ─── HEALTH EVENTS ────────────────────────────────────────────
 
-export async function getAllHealthEvents(): Promise<HealthEvent[]> {
-  const { data } = await supabase
+export async function getAllHealthEvents(client: SupabaseClient = supabase): Promise<HealthEvent[]> {
+  const { data } = await client
     .from('health_events').select('*').order('start_date', { ascending: false })
   return data ?? []
 }
 
-export async function getHealthEvent(id: string): Promise<HealthEvent | null> {
-  const { data } = await supabase
+export async function getHealthEvent(id: string, client: SupabaseClient = supabase): Promise<HealthEvent | null> {
+  const { data } = await client
     .from('health_events').select('*').eq('id', id).maybeSingle()
   return data
 }
 
-export async function upsertHealthEvent(event: Partial<HealthEvent> & { event_type: string; start_date: string }) {
-  return supabase.from('health_events').upsert(event).select().single()
+export async function upsertHealthEvent(event: Partial<HealthEvent> & { event_type: string; start_date: string }, client: SupabaseClient = supabase) {
+  return client.from('health_events').upsert(event).select().single()
 }
 
-export async function deleteHealthEvent(id: string) {
-  return supabase.from('health_events').delete().eq('id', id)
+export async function deleteHealthEvent(id: string, client: SupabaseClient = supabase) {
+  return client.from('health_events').delete().eq('id', id)
 }
 
-export async function getEventPhotos(eventId: string): Promise<HealthEventPhoto[]> {
-  const { data } = await supabase
+export async function getEventPhotos(eventId: string, client: SupabaseClient = supabase): Promise<HealthEventPhoto[]> {
+  const { data } = await client
     .from('health_event_photos').select('*').eq('health_event_id', eventId)
     .order('taken_at')
   return data ?? []
 }
 
 export async function uploadEventPhoto(
-  eventId: string, file: File, takenAt: string, notes?: string
+  eventId: string, file: File, takenAt: string, notes?: string, client: SupabaseClient = supabase
 ): Promise<HealthEventPhoto> {
   const fileName = `${eventId}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`
-  const { data: s, error: se } = await supabase.storage
+  const { data: s, error: se } = await client.storage
     .from('health-event-photos').upload(fileName, file, { contentType: file.type })
   if (se) throw se
-  const { data: urlData } = supabase.storage.from('health-event-photos').getPublicUrl(s.path)
-  const { data, error } = await supabase.from('health_event_photos')
+  const { data: urlData } = client.storage.from('health-event-photos').getPublicUrl(s.path)
+  const { data, error } = await client.from('health_event_photos')
     .insert({ health_event_id: eventId, photo_url: urlData.publicUrl, taken_at: takenAt, notes })
     .select().single()
   if (error) throw error
@@ -302,29 +302,29 @@ export async function uploadEventPhoto(
 
 // ─── WEEKLY PHOTOS ────────────────────────────────────────────
 
-export async function getWeeklyPhotos(weekOf: string): Promise<WeeklyPhoto[]> {
-  const { data } = await supabase
+export async function getWeeklyPhotos(weekOf: string, client: SupabaseClient = supabase): Promise<WeeklyPhoto[]> {
+  const { data } = await client
     .from('weekly_photos').select('*').eq('week_of', weekOf)
   return data ?? []
 }
 
-export async function getAllWeeklyPhotoWeeks(): Promise<string[]> {
-  const { data } = await supabase
+export async function getAllWeeklyPhotoWeeks(client: SupabaseClient = supabase): Promise<string[]> {
+  const { data } = await client
     .from('weekly_photos').select('week_of').order('week_of', { ascending: false })
   return [...new Set((data ?? []).map((r) => r.week_of))]
 }
 
 export async function uploadWeeklyPhoto(
-  weekOf: string, photoType: string, file: File, notes?: string
+  weekOf: string, photoType: string, file: File, notes?: string, client: SupabaseClient = supabase
 ): Promise<WeeklyPhoto> {
   const fileName = `${weekOf}/${photoType}_${Date.now()}.${file.name.split('.').pop()}`
-  const { data: s, error: se } = await supabase.storage
+  const { data: s, error: se } = await client.storage
     .from('weekly-photos').upload(fileName, file, { contentType: file.type })
   if (se) throw se
-  const { data: urlData } = supabase.storage.from('weekly-photos').getPublicUrl(s.path)
-  const { data, error } = await supabase.from('weekly_photos')
+  const { data: urlData } = client.storage.from('weekly-photos').getPublicUrl(s.path)
+  const { data, error } = await client.from('weekly_photos')
     .upsert({ week_of: weekOf, photo_type: photoType, photo_url: urlData.publicUrl, notes },
-      { onConflict: 'week_of,photo_type' })
+      { onConflict: 'user_id,week_of,photo_type' })
     .select().single()
   if (error) throw error
   return data
@@ -333,14 +333,14 @@ export async function uploadWeeklyPhoto(
 // Most recent tongue photo at or before a given week — used by the TCM
 // Practitioner specialist so it actually sees the photo instead of
 // reasoning from lifestyle logs alone.
-export async function getLatestTonguePhoto(beforeOrOnWeekOf: string): Promise<WeeklyPhoto | null> {
-  return getLatestWeeklyPhotoByType('tongue', beforeOrOnWeekOf)
+export async function getLatestTonguePhoto(beforeOrOnWeekOf: string, client: SupabaseClient = supabase): Promise<WeeklyPhoto | null> {
+  return getLatestWeeklyPhotoByType('tongue', beforeOrOnWeekOf, client)
 }
 
 // Generic version — used by Dermatologist for acne/flare photos, same
 // pattern as the tongue photo fetch for TCM.
-export async function getLatestWeeklyPhotoByType(photoType: string, beforeOrOnWeekOf: string): Promise<WeeklyPhoto | null> {
-  const { data } = await supabase
+export async function getLatestWeeklyPhotoByType(photoType: string, beforeOrOnWeekOf: string, client: SupabaseClient = supabase): Promise<WeeklyPhoto | null> {
+  const { data } = await client
     .from('weekly_photos')
     .select('*')
     .eq('photo_type', photoType)
@@ -357,8 +357,8 @@ export async function getLatestWeeklyPhotoByType(photoType: string, beforeOrOnWe
 // week" via timezone-sensitive date math not matching when/how a photo
 // was actually uploaded), and for a specialist that just wants the latest
 // available photo, that ceiling adds risk without real benefit.
-export async function getMostRecentWeeklyPhotoByType(photoType: string): Promise<WeeklyPhoto | null> {
-  const { data } = await supabase
+export async function getMostRecentWeeklyPhotoByType(photoType: string, client: SupabaseClient = supabase): Promise<WeeklyPhoto | null> {
+  const { data } = await client
     .from('weekly_photos')
     .select('*')
     .eq('photo_type', photoType)
@@ -370,29 +370,29 @@ export async function getMostRecentWeeklyPhotoByType(photoType: string): Promise
 
 // ─── BLOOD REPORTS ────────────────────────────────────────────
 
-export async function getAllBloodReports(): Promise<BloodReport[]> {
-  const { data } = await supabase
+export async function getAllBloodReports(client: SupabaseClient = supabase): Promise<BloodReport[]> {
+  const { data } = await client
     .from('blood_reports').select('*').order('report_date', { ascending: false })
   return data ?? []
 }
 
 // ─── FULL HISTORY (for AI agents) ────────────────────────────
 
-export async function getFullHistory(days = 90) {
+export async function getFullHistory(days = 90, client: SupabaseClient = supabase) {
   const since = new Date()
   since.setDate(since.getDate() - days)
   const sinceISO = since.toISOString().split('T')[0]
 
   const [logs, mentalStates, meals, exercise, recovery, supplements, healthEvents, periods] =
     await Promise.all([
-      supabase.from('daily_logs').select('*').gte('log_date', sinceISO).order('log_date'),
-      supabase.from('daily_mental_states').select('*').gte('log_date', sinceISO),
-      supabase.from('meals').select('*').gte('log_date', sinceISO),
-      supabase.from('daily_exercise').select('*').gte('log_date', sinceISO),
-      supabase.from('daily_recovery').select('*').gte('log_date', sinceISO),
-      supabase.from('daily_supplements').select('*').gte('log_date', sinceISO),
-      supabase.from('health_events').select('*').gte('start_date', sinceISO),
-      supabase.from('periods').select('*').gte('start_date', sinceISO),
+      client.from('daily_logs').select('*').gte('log_date', sinceISO).order('log_date'),
+      client.from('daily_mental_states').select('*').gte('log_date', sinceISO),
+      client.from('meals').select('*').gte('log_date', sinceISO),
+      client.from('daily_exercise').select('*').gte('log_date', sinceISO),
+      client.from('daily_recovery').select('*').gte('log_date', sinceISO),
+      client.from('daily_supplements').select('*').gte('log_date', sinceISO),
+      client.from('health_events').select('*').gte('start_date', sinceISO),
+      client.from('periods').select('*').gte('start_date', sinceISO),
     ])
 
   return {
@@ -405,4 +405,47 @@ export async function getFullHistory(days = 90) {
     healthEvents: healthEvents.data ?? [],
     periods: periods.data ?? [],
   }
+}
+
+// ─── PROFILE ──────────────────────────────────────────────────
+// RLS scopes these to the signed-in user, so no explicit id/user_id filter
+// is needed — there's at most one row visible per user.
+
+export async function getProfile(client: SupabaseClient = supabase): Promise<Profile | null> {
+  const { data } = await client
+    .from('profile').select('*').maybeSingle()
+  return data
+}
+
+export async function upsertProfile(payload: Partial<Profile>, client: SupabaseClient = supabase) {
+  return client
+    .from('profile').upsert(payload, { onConflict: 'user_id' }).select().single()
+}
+
+export async function getConditions(client: SupabaseClient = supabase): Promise<ProfileCondition[]> {
+  const { data } = await client
+    .from('profile_conditions').select('*').order('created_at', { ascending: false })
+  return data ?? []
+}
+
+export async function addCondition(payload: Partial<ProfileCondition> & { condition_name: string }, client: SupabaseClient = supabase) {
+  return client.from('profile_conditions').insert(payload).select().single()
+}
+
+export async function deleteCondition(id: string, client: SupabaseClient = supabase) {
+  return client.from('profile_conditions').delete().eq('id', id)
+}
+
+export async function getAllMedications(client: SupabaseClient = supabase): Promise<Medication[]> {
+  const { data } = await client
+    .from('medications').select('*').order('start_date', { ascending: false })
+  return data ?? []
+}
+
+export async function upsertMedication(payload: Partial<Medication> & { name: string }, client: SupabaseClient = supabase) {
+  return client.from('medications').upsert(payload).select().single()
+}
+
+export async function deleteMedication(id: string, client: SupabaseClient = supabase) {
+  return client.from('medications').delete().eq('id', id)
 }

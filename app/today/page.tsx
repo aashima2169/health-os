@@ -13,8 +13,9 @@
 //    so dismissing one doesn't dismiss the other.
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Suspense } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { todayISO, formatDisplay, mondayOfWeek } from '../../lib/date'
 import {
   getLog, getMentalStates, getExercise,
@@ -28,11 +29,9 @@ import MovementSection    from '../../components/today/MovementSection'
 import RecoverySection    from '../../components/today/RecoverySection'
 import SupplementsSection from '../../components/today/SupplementsSection'
 import DietSection        from '../../components/today/DietSection'
-import ReflectionSection  from '../../components/today/ReflectionSection'
 import type { DietState, BreathingType } from '../../types'
 
-const TODAY = todayISO()
-const TOTAL_SECTIONS = 7
+const TOTAL_SECTIONS = 6
 const PHOTO_REMINDER_KEY = 'healthos_weekly_photo_reminder_week'
 const TONGUE_REMINDER_KEY = 'healthos_tongue_photo_reminder_week'
 
@@ -50,7 +49,11 @@ const SAVE_MICROCOPY = [
   "You're doing great.",
 ]
 
-export default function TodayPage() {
+function TodayPageInner() {
+  const searchParams = useSearchParams()
+  const date = searchParams.get('date') ?? todayISO()
+  const isToday = date === todayISO()
+
   const [weight, setWeight]               = useState<number | ''>('')
   const [sleep, setSleep]                 = useState<number | ''>('')
   const [energy, setEnergy]               = useState<number | null>(null)
@@ -58,13 +61,11 @@ export default function TodayPage() {
   const [watchedSunrise, setWatchedSunrise] = useState(false)
   const [watchedSunset, setWatchedSunset] = useState(false)
   const [breathing, setBreathing]         = useState<BreathingType | null>(null)
-  const [groundingDone, setGroundingDone] = useState(false)
   const [mentalStates, setMentalStates]   = useState<string[]>([])
   const [exerciseTypes, setExerciseTypes] = useState<string[]>([])
   const [recovery, setRecovery]           = useState<string[]>([])
   const [supplements, setSupplements]     = useState<string[]>([])
   const [diet, setDiet]                   = useState<DietState>(BLANK_DIET)
-  const [reflection, setReflection]       = useState('')
 
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
@@ -83,8 +84,8 @@ export default function TodayPage() {
       const currentWeek = mondayOfWeek()
 
       const [log, states, ex, rec, sups, meals, weeklyPhotos] = await Promise.all([
-        getLog(TODAY), getMentalStates(TODAY), getExercise(TODAY),
-        getRecovery(TODAY), getSupplements(TODAY), getMeals(TODAY),
+        getLog(date), getMentalStates(date), getExercise(date),
+        getRecovery(date), getSupplements(date), getMeals(date),
         getWeeklyPhotos(currentWeek),
       ])
 
@@ -96,8 +97,6 @@ export default function TodayPage() {
         setWatchedSunrise(log.watched_sunrise)
         setWatchedSunset(log.watched_sunset)
         if (log.breathing) setBreathing(log.breathing as BreathingType)
-        setGroundingDone(log.grounding_done)
-        if (log.reflection) setReflection(log.reflection)
       }
       setMentalStates(states)
       setExerciseTypes(ex)
@@ -106,26 +105,30 @@ export default function TodayPage() {
       setDiet(mealsToDietState(meals))
       setWeeklyPhotoCount(weeklyPhotos.length)
 
-      // General reminder: only if this week's photos aren't all done, and
-      // we haven't already shown/dismissed it for this week.
-      const lastShownWeek = localStorage.getItem(PHOTO_REMINDER_KEY)
-      if (weeklyPhotos.length < 4 && lastShownWeek !== currentWeek) {
-        setShowPhotoReminder(true)
-      }
+      // These are nudges about the current week, not about whichever day
+      // is being edited — don't show them while editing a past day.
+      if (isToday) {
+        // General reminder: only if this week's photos aren't all done, and
+        // we haven't already shown/dismissed it for this week.
+        const lastShownWeek = localStorage.getItem(PHOTO_REMINDER_KEY)
+        if (weeklyPhotos.length < 4 && lastShownWeek !== currentWeek) {
+          setShowPhotoReminder(true)
+        }
 
-      // Tongue reminder: Saturdays only, and only if this week's tongue
-      // photo hasn't been uploaded yet, and not already dismissed this week.
-      const isSaturday = new Date().getDay() === 6
-      const tongueDoneThisWeek = weeklyPhotos.some((p) => p.photo_type === 'tongue')
-      const lastShownTongueWeek = localStorage.getItem(TONGUE_REMINDER_KEY)
-      if (isSaturday && !tongueDoneThisWeek && lastShownTongueWeek !== currentWeek) {
-        setShowTongueReminder(true)
+        // Tongue reminder: Saturdays only, and only if this week's tongue
+        // photo hasn't been uploaded yet, and not already dismissed this week.
+        const isSaturday = new Date().getDay() === 6
+        const tongueDoneThisWeek = weeklyPhotos.some((p) => p.photo_type === 'tongue')
+        const lastShownTongueWeek = localStorage.getItem(TONGUE_REMINDER_KEY)
+        if (isSaturday && !tongueDoneThisWeek && lastShownTongueWeek !== currentWeek) {
+          setShowTongueReminder(true)
+        }
       }
 
       setLoading(false)
     }
     load()
-  }, [])
+  }, [date, isToday])
 
   const dismissPhotoReminder = () => {
     localStorage.setItem(PHOTO_REMINDER_KEY, mondayOfWeek())
@@ -142,7 +145,7 @@ export default function TodayPage() {
     try {
       await Promise.all([
         saveCheckIn({
-          log_date: TODAY,
+          log_date: date,
           weight_kg: weight === '' ? null : weight,
           sleep_hours: sleep === '' ? null : sleep,
           energy_level: energy,
@@ -150,15 +153,13 @@ export default function TodayPage() {
           watched_sunrise: watchedSunrise,
           watched_sunset: watchedSunset,
           breathing,
-          grounding_done: groundingDone,
-          reflection,
           mental_states: mentalStates,
           exercise_types: exerciseTypes,
           recovery_activities: recovery,
           supplements,
           supplements_taken: supplements.length > 0,
         }),
-        setMeals(TODAY, diet),
+        setMeals(date, diet),
       ])
       const msg = SAVE_MICROCOPY[Math.floor(Math.random() * SAVE_MICROCOPY.length)]
       setSavedMsg(msg)
@@ -166,8 +167,8 @@ export default function TodayPage() {
     } finally {
       setSaving(false)
     }
-  }, [weight, sleep, energy, brainFog, watchedSunrise, watchedSunset, breathing,
-      groundingDone, reflection, mentalStates, exerciseTypes, recovery, supplements, diet])
+  }, [date, weight, sleep, energy, brainFog, watchedSunrise, watchedSunset, breathing,
+      mentalStates, exerciseTypes, recovery, supplements, diet])
 
   const dietFilled = Object.values(diet).some((s) => s.description.trim())
   const completedSections = [
@@ -177,7 +178,6 @@ export default function TodayPage() {
     recovery.length > 0,
     supplements.length > 0,
     dietFilled,
-    reflection.trim().length > 0,
   ].filter(Boolean).length
 
   const hour = new Date().getHours()
@@ -195,10 +195,12 @@ export default function TodayPage() {
       {/* Header */}
       <div className="px-5 pt-10 pb-5">
         <p className="text-xs font-semibold tracking-widest text-blue-600 uppercase mb-1">
-          Daily Check-in
+          {isToday ? 'Daily Check-in' : 'Editing a Past Day'}
         </p>
-        <h1 className="text-3xl font-bold text-slate-900">{greeting} 👋</h1>
-        <p className="text-slate-400 text-sm mt-1">{formatDisplay(TODAY)}</p>
+        <h1 className="text-3xl font-bold text-slate-900">
+          {isToday ? `${greeting} 👋` : 'Editing'}
+        </h1>
+        <p className="text-slate-400 text-sm mt-1">{formatDisplay(date)}</p>
       </div>
 
       {/* Saved toast */}
@@ -270,16 +272,15 @@ export default function TodayPage() {
         <BodySection
           weight={weight} sleep={sleep} energy={energy}
           brainFog={brainFog} watchedSunrise={watchedSunrise} watchedSunset={watchedSunset}
-          breathing={breathing} groundingDone={groundingDone}
+          breathing={breathing}
           onWeightChange={setWeight} onSleepChange={setSleep} onEnergyChange={setEnergy}
           onBrainFogChange={setBrainFog} onSunriseChange={setWatchedSunrise} onSunsetChange={setWatchedSunset}
-          onBreathingChange={setBreathing} onGroundingChange={setGroundingDone}
+          onBreathingChange={setBreathing}
         />
         <MovementSection  selected={exerciseTypes} onChange={setExerciseTypes} />
         <RecoverySection  selected={recovery}      onChange={setRecovery} />
         <SupplementsSection selected={supplements} onChange={setSupplements} />
         <DietSection diet={diet} onChange={setDiet} />
-        <ReflectionSection reflection={reflection} onChange={setReflection} />
 
         {/* Save */}
         <button
@@ -302,9 +303,23 @@ export default function TodayPage() {
         </button>
 
         <p className="text-center text-[11px] text-slate-300 pt-1">
-          You can check in multiple times a day — each save updates today's entry.
+          {isToday
+            ? "You can check in multiple times a day — each save updates today's entry."
+            : `Each save updates the entry for ${formatDisplay(date)}.`}
         </p>
       </div>
     </div>
+  )
+}
+
+export default function TodayPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#F7F8FC] flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <TodayPageInner />
+    </Suspense>
   )
 }

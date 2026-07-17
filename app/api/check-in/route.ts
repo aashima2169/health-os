@@ -1,8 +1,9 @@
 // app/api/check-in/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { waitUntil } from '@vercel/functions'
 import { saveCheckIn } from '../../../lib/db'
-import { regenerateLifestyleIntelligence } from '../../../lib/agents/lifestyleIntelligence'
+import { invalidateAgents } from '../../../lib/agents/store'
+import { SPECIALIST_AGENT_IDS } from '../../../lib/agents/specialistBoard'
+import { createRequestClient } from '../../../lib/supabaseServer'
 import type { CheckInPayload } from '../../../types'
 
 export const maxDuration = 280
@@ -15,13 +16,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'log_date is required' }, { status: 400 })
     }
 
-    await saveCheckIn(payload)
+    const client = await createRequestClient()
+    await saveCheckIn(payload, client)
 
-    waitUntil(
-      regenerateLifestyleIntelligence().catch((err) =>
-        console.error('[check-in] A2 regeneration after save failed:', err),
-      )
-    )
+    // AI analysis is fully manual now — Refresh on Insights is the only
+    // trigger. A check-in still invalidates every cached read it could
+    // have affected (a new day shifts every rolling window), so the next
+    // Refresh recomputes from fresh data instead of silently reusing a
+    // now-stale cache; it just doesn't spend a Gemini call automatically.
+    await invalidateAgents(client, ['A2', ...SPECIALIST_AGENT_IDS, 'A3'])
 
     return NextResponse.json({ ok: true })
   } catch (err) {
@@ -39,13 +42,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    const client = await createRequestClient()
     const { getLog, getMentalStates, getMeals, getExercise, getSupplements } = await import('../../../lib/db')
     const [log, mentalStates, foods, exerciseTypes, supplements] = await Promise.all([
-      getLog(date),
-      getMentalStates(date),
-      getMeals(date),
-      getExercise(date),
-      getSupplements(date),
+      getLog(date, client),
+      getMentalStates(date, client),
+      getMeals(date, client),
+      getExercise(date, client),
+      getSupplements(date, client),
     ])
     return NextResponse.json({ log, mentalStates, foods, exerciseTypes, supplements })
   } catch (err) {

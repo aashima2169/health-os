@@ -2,6 +2,10 @@
 // A3: Health Intelligence — regenerates the multi-specialist board plus
 // consolidator FOR A SPECIFIC PERIOD, and persists it under that period.
 // Triggered by A1 or A2 changing (event-driven), not by page load.
+//
+// Server-only — `client` is required (request-scoped, from
+// lib/supabaseServer.ts), threaded through to every store/gemini call.
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { callGeminiAgent } from './gemini'
 import { HEALTH_INTELLIGENCE_PROMPT, HEALTH_INTELLIGENCE_VERSION } from './prompts'
 import { runSpecialistBoard, SPECIALIST_AGENT_IDS } from './specialistBoard'
@@ -9,19 +13,19 @@ import { analyzeBloodIntelligence } from './bloodIntelligence'
 import { getAgentResult, saveAgentResult, claimGenerating, invalidateAgents } from './store'
 import { Period } from '../date'
 
-export async function regenerateHealthIntelligence(period: Period = 'month', opts: { force?: boolean } = {}): Promise<Record<string, any>> {
+export async function regenerateHealthIntelligence(client: SupabaseClient, period: Period = 'month', opts: { force?: boolean } = {}): Promise<Record<string, any>> {
   // Atomic DB-level claim — replaces the old in-memory Map lock, which
   // doesn't work on Vercel: each serverless invocation is an isolated
   // process with no shared memory, so two concurrent requests (e.g. rapid
   // tab-switching) could each think they're the only one running. This
   // claim uses a single atomic Postgres statement, so only one caller
   // ever wins it, regardless of how many separate invocations try at once.
-  const won = await claimGenerating('A3', period)
+  const won = await claimGenerating(client, 'A3', period)
   if (!won) {
     // Someone else (another invocation) already has an active claim on
     // this period. Don't start a duplicate regeneration — just return
     // whatever's currently stored so the caller has something to show.
-    const stored = await getAgentResult('A3', period)
+    const stored = await getAgentResult(client, 'A3', period)
     return stored?.result ?? { agent_id: 'A3', period, has_data: false, status: 'generating' }
   }
 
@@ -29,17 +33,17 @@ export async function regenerateHealthIntelligence(period: Period = 'month', opt
     if (opts.force) {
       // Manual "Refresh" — bypass the specialist cache for this period so
       // it's a genuinely fresh run, not a reuse of a prior success.
-      await invalidateAgents(SPECIALIST_AGENT_IDS)
+      await invalidateAgents(client, SPECIALIST_AGENT_IDS)
     }
 
     // Prefer the stored A1 result (period-independent) — avoids a
     // redundant Gemini call when this was triggered right after A1 itself
     // regenerated. Falls back to a live blood analysis only if nothing
     // has been stored yet.
-    const storedBlood = await getAgentResult('A1', 'all')
-    const bloodResult = storedBlood?.result ?? (await analyzeBloodIntelligence())
+    const storedBlood = await getAgentResult(client, 'A1', 'all')
+    const bloodResult = storedBlood?.result ?? (await analyzeBloodIntelligence(client))
 
-    const board = await runSpecialistBoard(bloodResult, period)
+    const board = await runSpecialistBoard(client, bloodResult, period)
     const anyBoardData = Object.values(board).some((s: any) => s.has_data)
 
     if (!bloodResult.has_data && !anyBoardData) {
@@ -50,11 +54,12 @@ export async function regenerateHealthIntelligence(period: Period = 'month', opt
         summary: 'Not enough data yet for the specialist board to weigh in. Upload a blood report and log a few check-ins to unlock this.',
         board,
       }
-      await saveAgentResult('A3', result, { period, version: HEALTH_INTELLIGENCE_VERSION })
+      await saveAgentResult(client, 'A3', result, { period, version: HEALTH_INTELLIGENCE_VERSION })
       return result
     }
 
     const consolidated = await callGeminiAgent<Record<string, any>>({
+      client,
       agentId: 'A3',
       promptVersion: HEALTH_INTELLIGENCE_VERSION,
       systemPrompt: HEALTH_INTELLIGENCE_PROMPT,
@@ -89,15 +94,15 @@ Run the case conference and produce the consolidated output described in your in
     })
 
     const result = { ...consolidated, period, board, has_data: true }
-    await saveAgentResult('A3', result, { period, version: HEALTH_INTELLIGENCE_VERSION })
+    await saveAgentResult(client, 'A3', result, { period, version: HEALTH_INTELLIGENCE_VERSION })
     return result
   } catch (err) {
     console.error('[A3] regenerate failed:', err)
-    await saveAgentResult('A3', {}, { period, version: HEALTH_INTELLIGENCE_VERSION, status: 'error', error: String(err) })
+    await saveAgentResult(client, 'A3', {}, { period, version: HEALTH_INTELLIGENCE_VERSION, status: 'error', error: String(err) })
     throw err
   }
 }
 
-export async function getStoredHealthIntelligence(period: Period = 'month') {
-  return getAgentResult('A3', period)
+export async function getStoredHealthIntelligence(client: SupabaseClient, period: Period = 'month') {
+  return getAgentResult(client, 'A3', period)
 }

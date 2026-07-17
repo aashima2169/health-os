@@ -10,6 +10,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import {
   getRecentLogs, getMentalStates, getMeals, getExercise, getRecovery,
   getActivePeriod, getAllHealthEvents,
@@ -150,6 +151,13 @@ function DayCard({ row }: { row: DayRow }) {
             <DetailRow key={e.id} label="Event" value={`${e.event_type}${e.body_location ? ' · ' + e.body_location : ''}`} accent="orange" />
           ))}
           {log.reflection && <DetailRow label="Reflection" value={log.reflection} />}
+
+          <Link
+            href={`/today?date=${log.log_date}`}
+            className="inline-block text-xs font-semibold text-blue-600 pt-1"
+          >
+            Edit this day →
+          </Link>
         </div>
       )}
     </div>

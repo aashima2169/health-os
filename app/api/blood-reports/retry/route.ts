@@ -1,9 +1,9 @@
 // app/api/blood-reports/retry/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { waitUntil } from '@vercel/functions'
-import { supabase } from '../../../../lib/supabase'
 import { extractMarkersFromPDF } from '../../../../lib/extractMarkers'
-import { regenerateBloodIntelligence } from '../../../../lib/agents/bloodIntelligence'
+import { invalidateAgents } from '../../../../lib/agents/store'
+import { SPECIALIST_AGENT_IDS } from '../../../../lib/agents/specialistBoard'
+import { createRequestClient } from '../../../../lib/supabaseServer'
 
 export const maxDuration = 280
 
@@ -12,7 +12,8 @@ export async function POST(req: NextRequest) {
     const { id } = await req.json()
     if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
-    const { data: report, error: fetchError } = await supabase
+    const client = await createRequestClient()
+    const { data: report, error: fetchError } = await client
       .from('blood_reports').select('*').eq('id', id).single()
 
     if (fetchError || !report) {
@@ -28,9 +29,9 @@ export async function POST(req: NextRequest) {
     }
 
     const base64PDF = Buffer.from(await pdfRes.arrayBuffer()).toString('base64')
-    const { markers, extractionError } = await extractMarkersFromPDF(base64PDF)
+    const { markers, extractionError } = await extractMarkersFromPDF(base64PDF, client)
 
-    const { data: updated, error: updateError } = await supabase
+    const { data: updated, error: updateError } = await client
       .from('blood_reports')
       .update({
         markers,
@@ -46,12 +47,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to update report' }, { status: 500 })
     }
 
+    // AI analysis is fully manual now — Refresh on Insights is the only
+    // trigger. See blood-reports/route.ts for why invalidation still
+    // happens without triggering a Gemini call.
     if (!extractionError) {
-      waitUntil(
-        regenerateBloodIntelligence().catch((err) =>
-          console.error('[blood-reports retry] A1 regeneration after retry failed:', err),
-        )
-      )
+      await invalidateAgents(client, ['A1', ...SPECIALIST_AGENT_IDS, 'A3'])
     }
 
     return NextResponse.json({

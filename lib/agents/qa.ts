@@ -3,7 +3,10 @@
 // person's own answers to them. Answers are fed back into that specialist's
 // next run as self-reported context — this is what closes the loop asked
 // for: "some of those questions can be redirected to the user."
-import { supabase } from '../supabase'
+//
+// Server-only — `client` is required (request-scoped, from
+// lib/supabaseServer.ts).
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface SpecialistQA {
   id: string
@@ -23,7 +26,7 @@ export interface SpecialistQA {
 // slightly different wording created a new row instead of matching an
 // existing one, so the same underlying question (e.g. hair/nail symptoms)
 // could appear 5-6 times across runs.
-export async function upsertQuestions(agentId: string, questions: string[]) {
+export async function upsertQuestions(client: SupabaseClient, agentId: string, questions: string[]) {
   if (!questions || questions.length === 0) return
   const capped = questions
     .filter((q) => typeof q === 'string' && q.trim().length > 0)
@@ -32,7 +35,7 @@ export async function upsertQuestions(agentId: string, questions: string[]) {
 
   // Remove this agent's previously-asked-but-never-answered questions —
   // they're being superseded by this run's batch. Answered ones stay.
-  const { error: deleteError } = await supabase
+  const { error: deleteError } = await client
     .from('specialist_qa')
     .delete()
     .eq('agent_id', agentId)
@@ -40,17 +43,17 @@ export async function upsertQuestions(agentId: string, questions: string[]) {
   if (deleteError) console.error(`[qa] cleanup for ${agentId} failed:`, deleteError)
 
   const rows = capped.map((q) => ({ agent_id: agentId, question: q.trim() }))
-  const { error } = await supabase
+  const { error } = await client
     .from('specialist_qa')
-    .upsert(rows, { onConflict: 'agent_id,question', ignoreDuplicates: true })
+    .upsert(rows, { onConflict: 'user_id,agent_id,question', ignoreDuplicates: true })
 
   if (error) console.error(`[qa] upsertQuestions(${agentId}) error:`, error)
 }
 
 // All questions for one specialist (answered or not) — used to feed
 // previously-answered ones back in as context on the next run.
-export async function getQuestionsForAgent(agentId: string): Promise<SpecialistQA[]> {
-  const { data, error } = await supabase
+export async function getQuestionsForAgent(client: SupabaseClient, agentId: string): Promise<SpecialistQA[]> {
+  const { data, error } = await client
     .from('specialist_qa')
     .select('*')
     .eq('agent_id', agentId)
@@ -65,8 +68,8 @@ export async function getQuestionsForAgent(agentId: string): Promise<SpecialistQ
 
 // All questions across every specialist — used by the Insights page's
 // "Questions For You" section.
-export async function getAllQuestions(): Promise<SpecialistQA[]> {
-  const { data, error } = await supabase
+export async function getAllQuestions(client: SupabaseClient): Promise<SpecialistQA[]> {
+  const { data, error } = await client
     .from('specialist_qa')
     .select('*')
     .order('created_at', { ascending: false })
@@ -78,12 +81,12 @@ export async function getAllQuestions(): Promise<SpecialistQA[]> {
   return data ?? []
 }
 
-export async function saveAnswer(agentId: string, question: string, answer: string) {
-  const { error } = await supabase
+export async function saveAnswer(client: SupabaseClient, agentId: string, question: string, answer: string) {
+  const { error } = await client
     .from('specialist_qa')
     .upsert(
       { agent_id: agentId, question: question.trim(), answer, answered_at: new Date().toISOString() },
-      { onConflict: 'agent_id,question' },
+      { onConflict: 'user_id,agent_id,question' },
     )
   if (error) console.error(`[qa] saveAnswer(${agentId}) error:`, error)
 }

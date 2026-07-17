@@ -3,15 +3,18 @@
 // Period-independent (always stored under period 'all'), since it reflects
 // the latest blood report regardless of what lifestyle timeframe is
 // selected elsewhere.
-import { supabase } from '../supabase'
+//
+// Server-only — `client` is required (request-scoped, from
+// lib/supabaseServer.ts), threaded through to every store/gemini call.
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { callGeminiAgent } from './gemini'
 import { BLOOD_INTELLIGENCE_PROMPT, BLOOD_INTELLIGENCE_VERSION } from './prompts'
 import { getAgentResult, saveAgentResult, claimGenerating, invalidateAgents } from './store'
 import { regenerateHealthIntelligence } from './healthIntelligence'
 import { SPECIALIST_AGENT_IDS } from './specialistBoard'
 
-export async function analyzeBloodIntelligence(): Promise<Record<string, any>> {
-  const { data: reports, error } = await supabase
+export async function analyzeBloodIntelligence(client: SupabaseClient): Promise<Record<string, any>> {
+  const { data: reports, error } = await client
     .from('blood_reports')
     .select('id, report_date, markers, notes, extraction_status')
     .eq('extraction_status', 'success')
@@ -32,6 +35,7 @@ export async function analyzeBloodIntelligence(): Promise<Record<string, any>> {
   const previous = reports.length >= 2 ? reports[reports.length - 2] : null
 
   const result = await callGeminiAgent<Record<string, any>>({
+    client,
     agentId: 'A1',
     promptVersion: BLOOD_INTELLIGENCE_VERSION,
     systemPrompt: BLOOD_INTELLIGENCE_PROMPT,
@@ -65,35 +69,35 @@ ${reports.length > 2
 // Marks 'generating' immediately so a concurrent poll sees progress
 // instead of nothing, and to avoid a second redundant trigger firing
 // while this one is still in flight.
-export async function regenerateBloodIntelligence(): Promise<Record<string, any>> {
-  const won = await claimGenerating('A1', 'all')
+export async function regenerateBloodIntelligence(client: SupabaseClient): Promise<Record<string, any>> {
+  const won = await claimGenerating(client, 'A1', 'all')
   if (!won) {
-    const stored = await getAgentResult('A1', 'all')
+    const stored = await getAgentResult(client, 'A1', 'all')
     return stored?.result ?? { agent_id: 'A1', has_data: false, status: 'generating' }
   }
 
   try {
-    const result = await analyzeBloodIntelligence()
-    await saveAgentResult('A1', result, { period: 'all', version: BLOOD_INTELLIGENCE_VERSION })
+    const result = await analyzeBloodIntelligence(client)
+    await saveAgentResult(client, 'A1', result, { period: 'all', version: BLOOD_INTELLIGENCE_VERSION })
 
     // New blood data can change every specialist's read (all five now
     // receive Blood Intelligence as context), so their cached results
     // across every period are stale — clear them so A3's regeneration
     // below actually re-runs them instead of reusing stale reads.
-    await invalidateAgents(SPECIALIST_AGENT_IDS)
+    await invalidateAgents(client, SPECIALIST_AGENT_IDS)
 
-    regenerateHealthIntelligence().catch((err) =>
+    regenerateHealthIntelligence(client).catch((err) =>
       console.error('[A1 -> A3 cascade] failed:', err),
     )
 
     return result
   } catch (err) {
     console.error('[A1] regenerate failed:', err)
-    await saveAgentResult('A1', {}, { period: 'all', version: BLOOD_INTELLIGENCE_VERSION, status: 'error', error: String(err) })
+    await saveAgentResult(client, 'A1', {}, { period: 'all', version: BLOOD_INTELLIGENCE_VERSION, status: 'error', error: String(err) })
     throw err
   }
 }
 
-export async function getStoredBloodIntelligence() {
-  return getAgentResult('A1', 'all')
+export async function getStoredBloodIntelligence(client: SupabaseClient) {
+  return getAgentResult(client, 'A1', 'all')
 }

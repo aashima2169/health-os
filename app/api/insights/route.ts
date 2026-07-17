@@ -1,6 +1,7 @@
 // app/api/insights/route.ts
 import { NextResponse } from 'next/server'
 import { getFullHistory } from '../../../lib/db'
+import { createRequestClient } from '../../../lib/supabaseServer'
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!
 const GEMINI_URL =
@@ -39,7 +40,8 @@ Respond ONLY with valid JSON in this exact shape, no markdown, no preamble:
 
 export async function GET() {
   try {
-    const data = await getFullHistory(90)
+    const client = await createRequestClient()
+    const data = await getFullHistory(90, client)
 
     // If there's very little data, return a placeholder
     const hasEnoughData = data.logs.length >= 3

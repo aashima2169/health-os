@@ -2,8 +2,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callGeminiAgent } from '../../../../lib/agents/gemini'
 import { MONTHLY_REVIEW_PROMPT, MONTHLY_REVIEW_VERSION } from '../../../../lib/agents/prompts'
-import { supabase } from '../../../../lib/supabase'
+import { createRequestClient } from '../../../../lib/supabaseServer'
 
+// NOTE: this route queries 'flares' and 'experiments' tables — 'flares'
+// exists live but was never added to schema.sql or this Phase 2 migration
+// (health_events is the real events table), and 'experiments' doesn't
+// exist in the database at all. This route was already broken before
+// Phase 2 (the experiments query would throw) — left as-is, only the
+// Supabase client below was swapped for RLS compatibility.
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -17,17 +23,19 @@ export async function GET(req: NextRequest) {
     const start = `${year}-${String(mo).padStart(2, '0')}-01`
     const end = new Date(year, mo, 0).toISOString().split('T')[0] // last day of month
 
+    const client = await createRequestClient()
+
     // Fetch all data for the month in parallel
     const [logs, mentalStates, meals, exercise, supplements, flares, periods, experiments] =
       await Promise.all([
-        supabase.from('daily_logs').select('*').gte('log_date', start).lte('log_date', end),
-        supabase.from('daily_mental_states').select('*').gte('log_date', start).lte('log_date', end),
-        supabase.from('meals').select('*').gte('log_date', start).lte('log_date', end),
-        supabase.from('daily_exercise').select('*').gte('log_date', start).lte('log_date', end),
-        supabase.from('daily_supplements').select('*').gte('log_date', start).lte('log_date', end),
-        supabase.from('flares').select('*').gte('start_date', start).lte('start_date', end),
-        supabase.from('periods').select('*').gte('start_date', start).lte('start_date', end),
-        supabase.from('experiments').select('*').gte('created_at', start).lte('created_at', end),
+        client.from('daily_logs').select('*').gte('log_date', start).lte('log_date', end),
+        client.from('daily_mental_states').select('*').gte('log_date', start).lte('log_date', end),
+        client.from('meals').select('*').gte('log_date', start).lte('log_date', end),
+        client.from('daily_exercise').select('*').gte('log_date', start).lte('log_date', end),
+        client.from('daily_supplements').select('*').gte('log_date', start).lte('log_date', end),
+        client.from('flares').select('*').gte('start_date', start).lte('start_date', end),
+        client.from('periods').select('*').gte('start_date', start).lte('start_date', end),
+        client.from('experiments').select('*').gte('created_at', start).lte('created_at', end),
       ])
 
     const monthLabel = new Date(year, mo - 1, 1).toLocaleDateString('en-IN', {
@@ -36,6 +44,7 @@ export async function GET(req: NextRequest) {
     })
 
     const result = await callGeminiAgent({
+      client,
       agentId: 'A8',
       promptVersion: MONTHLY_REVIEW_VERSION,
       systemPrompt: MONTHLY_REVIEW_PROMPT,

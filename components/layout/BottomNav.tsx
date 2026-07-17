@@ -1,8 +1,12 @@
 // components/layout/BottomNav.tsx
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import NavDrawer from './NavDrawer'
+
+const DRAWER_PATHS = ['/settings', '/profile', '/about']
 
 const tabs = [
   {
@@ -40,6 +44,16 @@ const tabs = [
     ),
   },
   {
+    href: '/signals', label: 'Signals',
+    icon: (a: boolean) => (
+      <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="10" r="1.6" fill={a ? '#2563EB' : '#94a3b8'} />
+        <path d="M6.5 6.5a5 5 0 000 7M13.5 6.5a5 5 0 010 7M4 4a8 8 0 000 12M16 4a8 8 0 010 12"
+          stroke={a ? '#2563EB' : '#94a3b8'} strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: '/settings', label: 'Settings',
     icon: (a: boolean) => (
       <svg className="w-5 h-5" viewBox="0 0 20 20" fill="none">
@@ -53,22 +67,40 @@ const tabs = [
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  if (pathname.startsWith('/sign-in')) return null
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-50">
-      <div className="max-w-lg mx-auto flex">
-        {tabs.map((tab) => {
-          const active = pathname.startsWith(tab.href)
-          return (
-            <Link key={tab.href} href={tab.href}
-              className="flex-1 flex flex-col items-center justify-center py-3 gap-1">
-              {tab.icon(active)}
-              <span className={`text-[10px] font-medium ${active ? 'text-blue-600' : 'text-slate-400'}`}>
-                {tab.label}
-              </span>
-            </Link>
-          )
-        })}
-      </div>
-    </nav>
+    <>
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-100 z-50">
+        <div className="max-w-lg mx-auto flex">
+          {tabs.map((tab) => {
+            if (tab.href === '/settings') {
+              const active = DRAWER_PATHS.some((p) => pathname.startsWith(p))
+              return (
+                <button key={tab.href} type="button" onClick={() => setDrawerOpen(true)}
+                  className="flex-1 flex flex-col items-center justify-center py-3 gap-1">
+                  {tab.icon(active)}
+                  <span className={`text-[10px] font-medium ${active ? 'text-blue-600' : 'text-slate-400'}`}>
+                    {tab.label}
+                  </span>
+                </button>
+              )
+            }
+            const active = pathname.startsWith(tab.href)
+            return (
+              <Link key={tab.href} href={tab.href}
+                className="flex-1 flex flex-col items-center justify-center py-3 gap-1">
+                {tab.icon(active)}
+                <span className={`text-[10px] font-medium ${active ? 'text-blue-600' : 'text-slate-400'}`}>
+                  {tab.label}
+                </span>
+              </Link>
+            )
+          })}
+        </div>
+      </nav>
+      <NavDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+    </>
   )
 }

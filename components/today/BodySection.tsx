@@ -17,7 +17,6 @@ interface BodySectionProps {
   watchedSunrise: boolean
   watchedSunset: boolean
   breathing: BreathingType | null
-  groundingDone: boolean
   onWeightChange: (v: number | '') => void
   onSleepChange: (v: number | '') => void
   onEnergyChange: (v: number) => void
@@ -25,15 +24,14 @@ interface BodySectionProps {
   onSunriseChange: (v: boolean) => void
   onSunsetChange: (v: boolean) => void
   onBreathingChange: (v: BreathingType | null) => void
-  onGroundingChange: (v: boolean) => void
 }
 
 export default function BodySection({
   weight, sleep, energy, brainFog, watchedSunrise, watchedSunset,
-  breathing, groundingDone,
+  breathing,
   onWeightChange, onSleepChange, onEnergyChange,
   onBrainFogChange, onSunriseChange, onSunsetChange,
-  onBreathingChange, onGroundingChange,
+  onBreathingChange,
 }: BodySectionProps) {
   const completed = (weight !== '' && Number(weight) > 0) ||
     (sleep !== '' && Number(sleep) > 0) || energy !== null
@@ -97,24 +95,24 @@ export default function BodySection({
             checked={brainFog}
             onChange={onBrainFogChange}
           />
-          <Toggle
-            emoji="🌱"
-            label="Grounding done"
-            checked={groundingDone}
-            onChange={onGroundingChange}
-          />
-          <Toggle
-            emoji="🌅"
-            label="Watched sunrise"
-            checked={watchedSunrise}
-            onChange={onSunriseChange}
-          />
-          <Toggle
-            emoji="🌇"
-            label="Watched sunset"
-            checked={watchedSunset}
-            onChange={onSunsetChange}
-          />
+        </div>
+
+        <div>
+          <p className="text-sm font-medium text-slate-500 mb-2">Circadian Rhythm Sync</p>
+          <div className="space-y-1">
+            <Toggle
+              emoji="🌅"
+              label="Watched sunrise"
+              checked={watchedSunrise}
+              onChange={onSunriseChange}
+            />
+            <Toggle
+              emoji="🌇"
+              label="Watched sunset"
+              checked={watchedSunset}
+              onChange={onSunsetChange}
+            />
+          </div>
         </div>
       </div>
     </SectionCard>

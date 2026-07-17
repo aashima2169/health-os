@@ -10,6 +10,7 @@ import { getStoredHealthIntelligence, regenerateHealthIntelligence } from '../..
 import { getSpecialistBoardSnapshot } from '../../../../lib/agents/specialistBoard'
 import { isValidPeriod, Period } from '../../../../lib/date'
 import type { AgentInsightRow } from '../../../../lib/agents/store'
+import { createRequestClient } from '../../../../lib/supabaseServer'
 
 // Hobby plan with Fluid Compute (default) supports up to 300s — 280 leaves
 // margin. The full 6-specialist board + consolidator (~7-8 Gemini calls,
@@ -38,33 +39,37 @@ export async function GET(req: NextRequest) {
     const periodParam = searchParams.get('period')
     const period: Period = isValidPeriod(periodParam) ? periodParam : 'month'
 
-    const stored = await getStoredHealthIntelligence(period)
+    const client = await createRequestClient()
+    const stored = await getStoredHealthIntelligence(client, period)
 
     if (stored && stored.status === 'success') {
       return NextResponse.json({ ...stored.result, status: 'success', generated_at: stored.generated_at })
     }
 
-    const board = normalizeBoard(await getSpecialistBoardSnapshot(period))
+    const board = normalizeBoard(await getSpecialistBoardSnapshot(client, period))
 
-    // See blood-analysis/route.ts for why staleness matters here — a
-    // frozen 'generating' row must not be trusted forever, or it never
-    // gets retried by any future request.
+    // A 'generating' status is only trustworthy if recent — see
+    // blood-analysis/route.ts for why. A stale one means whatever process
+    // set it likely died; fall through and treat it like "never generated"
+    // below, same as a missing row.
     const STALE_MS = 6 * 60 * 1000
-    const isStale = stored?.generated_at && (Date.now() - new Date(stored.generated_at).getTime() > STALE_MS)
+    const isStale = !!stored?.generated_at && (Date.now() - new Date(stored.generated_at).getTime() > STALE_MS)
 
     if (stored && stored.status === 'generating' && !isStale) {
       return NextResponse.json({ status: 'generating', period, generated_at: stored.generated_at, board })
     }
 
-    // waitUntil keeps this execution alive long enough for the background
-    // work to finish, even after this response is returned — a bare
-    // `.catch(...)` without waitUntil gets killed by Vercel the instant
-    // the response is sent, which is very likely why regenerations were
-    // completing only partially before.
-    waitUntil(
-      regenerateHealthIntelligence(period).catch((err) => console.error('[A3] bootstrap failed:', err))
-    )
-    return NextResponse.json({ status: 'generating', period, generated_at: null, board })
+    // AI analysis is fully manual now — Refresh on Insights is the only
+    // trigger (see the POST handler below). Nothing stored, or stale, just
+    // means "not generated yet" — it's not a signal to kick off work.
+    return NextResponse.json({
+      status: 'success',
+      has_data: false,
+      message: 'Not generated yet — tap Refresh to check for patterns.',
+      period,
+      generated_at: null,
+      board,
+    })
   } catch (err) {
     console.error('[A3] error:', err)
     return NextResponse.json({ error: String(err) }, { status: 500 })
@@ -79,8 +84,9 @@ export async function POST(req: NextRequest) {
     const periodParam = searchParams.get('period')
     const period: Period = isValidPeriod(periodParam) ? periodParam : 'month'
 
+    const client = await createRequestClient()
     waitUntil(
-      regenerateHealthIntelligence(period, { force: true }).catch((err) => console.error('[A3] manual regenerate failed:', err))
+      regenerateHealthIntelligence(client, period, { force: true }).catch((err) => console.error('[A3] manual regenerate failed:', err))
     )
     return NextResponse.json({ status: 'generating', period })
   } catch (err) {

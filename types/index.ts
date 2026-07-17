@@ -151,3 +151,38 @@ export interface InsightResponse {
   patterns: string[]
   recommendations: string[]
 }
+
+// ─── PROFILE ────────────────────────────────────────────────────
+export type Gender = 'female' | 'male' | 'other' | 'prefer_not_to_say'
+export type MenstruatingStatus = 'menstruating' | 'not_menstruating'
+
+export interface Profile {
+  id: string
+  gender: Gender | null
+  age: number | null
+  city: string | null
+  lat: number | null
+  lon: number | null
+  menstruating_status: MenstruatingStatus | null
+  updated_at: string
+}
+
+export interface ProfileCondition {
+  id: string
+  condition_name: string
+  diagnosed_date: string | null
+  notes: string | null
+  created_at: string
+}
+
+export interface Medication {
+  id: string
+  name: string
+  dosage: string | null
+  frequency: string | null
+  start_date: string | null
+  end_date: string | null
+  notes: string | null
+  prescription_url: string | null
+  created_at: string
+}

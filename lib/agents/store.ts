@@ -3,9 +3,13 @@
 // supports a 'generating' status so routes can mark a background job as
 // in-flight and the frontend can poll and show a loader instead of a
 // blank screen.
-import { supabase } from '../supabase'
+//
+// This module only ever runs server-side, so `client` is a required
+// parameter (a request-scoped client from lib/supabaseServer.ts) — there's
+// no safe default here the way lib/db.ts has for browser callers.
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type AgentId = 'A1' | 'A2' | 'A3' | 'A3a' | 'A3b' | 'A3c' | 'A3d' | 'A3e' | 'A3f'
+export type AgentId = 'A1' | 'A2' | 'A3' | 'A3a' | 'A3b' | 'A3c' | 'A3d' | 'A3e' | 'A3f' | 'SIGNALS'
 export type AgentStatus = 'success' | 'error' | 'generating'
 
 export interface AgentInsightRow {
@@ -18,8 +22,8 @@ export interface AgentInsightRow {
   generated_at: string
 }
 
-export async function getAgentResult(agentId: AgentId, period = 'all'): Promise<AgentInsightRow | null> {
-  const { data, error } = await supabase
+export async function getAgentResult(client: SupabaseClient, agentId: AgentId, period = 'all'): Promise<AgentInsightRow | null> {
+  const { data, error } = await client
     .from('agent_insights')
     .select('*')
     .eq('agent_id', agentId)
@@ -34,11 +38,12 @@ export async function getAgentResult(agentId: AgentId, period = 'all'): Promise<
 }
 
 export async function saveAgentResult(
+  client: SupabaseClient,
   agentId: AgentId,
   result: Record<string, any>,
   opts: { period?: string; version?: string; status?: AgentStatus; error?: string } = {},
 ) {
-  const { error } = await supabase
+  const { error } = await client
     .from('agent_insights')
     .upsert(
       {
@@ -50,7 +55,7 @@ export async function saveAgentResult(
         error: opts.error ?? null,
         generated_at: new Date().toISOString(),
       },
-      { onConflict: 'agent_id,period' },
+      { onConflict: 'user_id,agent_id,period' },
     )
 
   if (error) console.error(`[store] saveAgentResult(${agentId}, ${opts.period ?? 'all'}) error:`, error)
@@ -59,8 +64,8 @@ export async function saveAgentResult(
 // Marks a row as 'generating' immediately, before the actual Gemini work
 // starts — so a concurrent page load or poll sees "in progress" rather
 // than nothing, and doesn't trigger a second redundant regeneration.
-export async function markGenerating(agentId: AgentId, period = 'all') {
-  await saveAgentResult(agentId, {}, { period, status: 'generating' })
+export async function markGenerating(client: SupabaseClient, agentId: AgentId, period = 'all') {
+  await saveAgentResult(client, agentId, {}, { period, status: 'generating' })
 }
 
 // Atomically claims the right to regenerate (agentId, period). Returns
@@ -77,8 +82,8 @@ export async function markGenerating(agentId: AgentId, period = 'all') {
 // that one failed. This uses a single atomic SQL statement instead
 // (INSERT ... ON CONFLICT DO UPDATE ... WHERE), which Postgres guarantees
 // only one concurrent caller can win, regardless of process boundaries.
-export async function claimGenerating(agentId: AgentId, period = 'all', staleSeconds = 360): Promise<boolean> {
-  const { data, error } = await supabase.rpc('claim_agent_generation', {
+export async function claimGenerating(client: SupabaseClient, agentId: AgentId, period = 'all', staleSeconds = 360): Promise<boolean> {
+  const { data, error } = await client.rpc('claim_agent_generation', {
     p_agent_id: agentId,
     p_period: period,
     p_stale_seconds: staleSeconds,
@@ -96,14 +101,14 @@ export async function claimGenerating(agentId: AgentId, period = 'all', staleSec
 // since they may have consumed the data that just changed. Without this,
 // a specialist that succeeded before a new check-in would keep getting
 // reused forever, showing stale analysis.
-export async function invalidateAgents(agentIds: AgentId[]) {
-  const { error } = await supabase.from('agent_insights').delete().in('agent_id', agentIds)
+export async function invalidateAgents(client: SupabaseClient, agentIds: AgentId[]) {
+  const { error } = await client.from('agent_insights').delete().in('agent_id', agentIds)
   if (error) console.error(`[store] invalidateAgents(${agentIds.join(',')}) error:`, error)
 }
 
 // Deletes a single (agent, period) row — used for a forced manual refresh
 // of one specific timeframe without nuking every other period's cache.
-export async function invalidateAgentPeriod(agentId: AgentId, period: string) {
-  const { error } = await supabase.from('agent_insights').delete().eq('agent_id', agentId).eq('period', period)
+export async function invalidateAgentPeriod(client: SupabaseClient, agentId: AgentId, period: string) {
+  const { error } = await client.from('agent_insights').delete().eq('agent_id', agentId).eq('period', period)
   if (error) console.error(`[store] invalidateAgentPeriod(${agentId}, ${period}) error:`, error)
 }

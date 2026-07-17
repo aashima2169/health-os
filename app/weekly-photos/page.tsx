@@ -46,6 +46,12 @@ export default function WeeklyPhotosPage() {
       if (!allWeeks.includes(selectedWeek)) {
         setAllWeeks((prev) => [selectedWeek, ...prev])
       }
+
+      // A fresh tongue reading is worth a scoped TCM refresh (cascades
+      // into Signals) rather than waiting for a manual board Refresh.
+      if (type === 'tongue') {
+        fetch('/api/agents/tcm-refresh', { method: 'POST' }).catch(() => {})
+      }
     } finally {
       setUploading(null)
     }

@@ -7,8 +7,8 @@ import BottomNav from '../components/layout/BottomNav'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Health OS',
-  description: 'Your personal health operating system',
+  title: 'Flarewise',
+  description: 'Understand your flares and patterns over time',
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
 }
 

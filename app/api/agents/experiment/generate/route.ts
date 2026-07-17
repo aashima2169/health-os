@@ -2,12 +2,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { callGeminiAgent } from '../../../../../lib/agents/gemini'
 import { EXPERIMENT_PROMPT, EXPERIMENT_VERSION } from '../../../../../lib/agents/prompts'
+import { createRequestClient } from '../../../../../lib/supabaseServer'
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+    const client = await createRequestClient()
 
     const result = await callGeminiAgent({
+      client,
       agentId: 'A2',
       promptVersion: EXPERIMENT_VERSION,
       systemPrompt: EXPERIMENT_PROMPT,

@@ -5,11 +5,14 @@
 // etc.) and a small set of config options — any other named export fails
 // the build-time route type check.
 
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { logGeminiCall } from './tokenLog'
+
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!
 
-export async function extractMarkersFromPDF(base64PDF: string): Promise<{
+export async function extractMarkersFromPDF(base64PDF: string, client: SupabaseClient): Promise<{
   markers: Record<string, { value: number; unit: string; reference?: string }>
   extractionError?: string
 }> {
@@ -31,6 +34,7 @@ RULES:
 FORMAT:
 {"MarkerName":{"value":13.2,"unit":"g/dL","reference":"12.0 - 17.0"},"Next":{"value":95,"unit":"fL"}}`
 
+  const startTime = Date.now()
   try {
     const response = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
       method: 'POST',
@@ -56,6 +60,12 @@ FORMAT:
     }
 
     const geminiData = await response.json()
+    const usage = geminiData.usageMetadata ?? {}
+    logGeminiCall(client, 'EXTRACT_MARKERS', {
+      input: usage.promptTokenCount ?? 0,
+      output: usage.candidatesTokenCount ?? 0,
+      total: usage.totalTokenCount ?? 0,
+    }, Date.now() - startTime).catch(() => {})
 
     if (!geminiData.candidates?.length) {
       const reason = geminiData.promptFeedback?.blockReason ?? 'unknown'

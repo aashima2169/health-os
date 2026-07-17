@@ -1,5 +1,5 @@
 {
-  "name": "health-os",
+  "name": "flarewise",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -15,6 +15,7 @@
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.108.2",
     "@vercel/functions": "^3.7.5",
     "class-variance-authority": "^0.7.1",
@@ -26,6 +27,7 @@
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.62.0",
     "recharts": "^3.1.2",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^3.3.1",
     "zod": "^4.1.5",
     "zustand": "^5.0.8"

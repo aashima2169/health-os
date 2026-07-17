@@ -36,6 +36,10 @@ export default function PeriodsPage() {
       if (!endDate) setActive(data)
       setShowForm(false)
       setStartDate(''); setEndDate('')
+
+      // New period logged — worth a fresh Signals pass without the user
+      // needing to remember to hit Refresh themselves.
+      fetch('/api/agents/signals', { method: 'POST' }).catch(() => {})
     } finally {
       setSaving(false)
     }

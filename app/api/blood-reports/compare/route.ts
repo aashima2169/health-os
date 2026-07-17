@@ -1,6 +1,6 @@
 // app/api/blood-reports/compare/route.ts
 import { NextResponse } from 'next/server'
-import { supabase } from '../../../../lib/supabase'
+import { createRequestClient } from '../../../../lib/supabaseServer'
 
 const GEMINI_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
@@ -9,7 +9,8 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY!
 export async function GET() {
   try {
     // Fetch all reports ordered by date
-    const { data: reports, error } = await supabase
+    const client = await createRequestClient()
+    const { data: reports, error } = await client
       .from('blood_reports')
       .select('id, report_date, markers, notes')
       .order('report_date', { ascending: true })
