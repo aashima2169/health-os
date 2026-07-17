@@ -341,6 +341,23 @@ comment on table signal_pattern_log is 'One row per Signals run: the determinist
 
 
 -- ────────────────────────────────────────────────────────────────────────
+-- USER CONSENT — one-time, per-account data consent
+-- ────────────────────────────────────────────────────────────────────────
+-- Recorded once, right after a person's first-ever sign-in (see
+-- app/consent/page.tsx). middleware.ts checks this on every request for a
+-- signed-in user and redirects to /consent if missing — a real gate, not
+-- just sign-in-page decoration. Full RLS setup in
+-- supabase/phase_user_consent.sql.
+
+create table if not exists user_consent (
+  user_id uuid primary key references auth.users(id) default auth.uid(),
+  consented_at timestamptz not null default now()
+);
+
+comment on table user_consent is 'One row per user, inserted once when they accept the data-consent screen. Presence of a row = consented; there is no update/delete path.';
+
+
+-- ────────────────────────────────────────────────────────────────────────
 -- ROW LEVEL SECURITY — every table scoped to auth.uid() = user_id
 -- ────────────────────────────────────────────────────────────────────────
 -- Applied via supabase/phase2_step5-6_rls_and_storage.sql, which loops this
