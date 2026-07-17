@@ -34,21 +34,30 @@ export async function middleware(request: NextRequest) {
 
   // getUser() (not getSession()) actually validates the token against
   // Supabase and refreshes it if needed — getSession() alone would trust
-  // a locally-cached, possibly-stale token.
+  // a locally-cached, possibly-stale token. A refresh here rewrites
+  // `response` via the setAll callback above — every redirect below must
+  // carry those cookies forward via this helper, or a just-refreshed
+  // session gets silently dropped, leaving the next request to run with a
+  // stale/invalid token (which looks identical to "no session" or "no
+  // consent row" to any RLS-scoped query, since auth.uid() resolves null).
   const { data: { user } } = await supabase.auth.getUser()
+
+  const redirectTo = (pathname: string) => {
+    const url = request.nextUrl.clone()
+    url.pathname = pathname
+    const redirectResponse = NextResponse.redirect(url)
+    response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie))
+    return redirectResponse
+  }
 
   const isPublicPath = PUBLIC_PATHS.some((p) => request.nextUrl.pathname.startsWith(p))
 
   if (!user && !isPublicPath) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/sign-in'
-    return NextResponse.redirect(url)
+    return redirectTo('/sign-in')
   }
 
   if (user && request.nextUrl.pathname.startsWith('/sign-in')) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/'
-    return NextResponse.redirect(url)
+    return redirectTo('/')
   }
 
   if (user) {
@@ -61,15 +70,11 @@ export async function middleware(request: NextRequest) {
     const onConsentPath = request.nextUrl.pathname.startsWith(CONSENT_PATH)
 
     if (!consent && !onConsentPath) {
-      const url = request.nextUrl.clone()
-      url.pathname = CONSENT_PATH
-      return NextResponse.redirect(url)
+      return redirectTo(CONSENT_PATH)
     }
 
     if (consent && onConsentPath) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/'
-      return NextResponse.redirect(url)
+      return redirectTo('/')
     }
   }
 

@@ -19,7 +19,11 @@ export default function ConsentPage() {
     setSaving(true)
     setError(null)
     const { error } = await supabase.from('user_consent').insert({})
-    if (error) {
+    // 23505 = unique_violation — a row for this account already exists
+    // (e.g. a prior attempt succeeded but a redirect hiccup brought them
+    // back here). That's not a failure, it just means they're already
+    // consented — proceed exactly as if this insert had succeeded.
+    if (error && error.code !== '23505') {
       setError('Something went wrong — please try again.')
       setSaving(false)
       return
