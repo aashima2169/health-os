@@ -67,7 +67,7 @@ export default function BodySection({
 
         {/* Breathing — single select deep/shallow */}
         <div>
-          <p className="text-sm font-medium text-slate-500 mb-2">Breathing today</p>
+          <p className="text-sm font-medium text-ink-soft mb-2">Breathing today</p>
           <div className="flex gap-2">
             {(['deep', 'shallow'] as BreathingType[]).map((opt) => (
               <button
@@ -77,8 +77,8 @@ export default function BodySection({
                 className={`flex-1 h-11 rounded-xl text-sm font-medium capitalize
                   transition-all duration-150
                   ${breathing === opt
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-50 text-slate-700 border border-slate-200 hover:border-blue-300'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-surface-alt text-ink border border-line hover:border-primary/50'
                   }`}
               >
                 {opt === 'deep' ? '🫁 Deep' : '💨 Shallow'}
@@ -87,7 +87,7 @@ export default function BodySection({
           </div>
         </div>
 
-        <div className="border-t border-slate-100 pt-3 space-y-1">
+        <div className="border-t border-line pt-3 space-y-1">
           <Toggle
             emoji="🌫️"
             label="Brain fog today"
@@ -98,16 +98,16 @@ export default function BodySection({
         </div>
 
         <div>
-          <p className="text-sm font-medium text-slate-500 mb-2">Circadian Rhythm Sync</p>
+          <p className="text-sm font-medium text-ink-soft mb-2">Circadian Rhythm Sync</p>
           <div className="space-y-1">
             <Toggle
-              emoji="🌅"
+              emoji="☀️"
               label="Watched sunrise"
               checked={watchedSunrise}
               onChange={onSunriseChange}
             />
             <Toggle
-              emoji="🌇"
+              emoji="🌙"
               label="Watched sunset"
               checked={watchedSunset}
               onChange={onSunsetChange}

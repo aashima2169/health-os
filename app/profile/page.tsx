@@ -85,20 +85,20 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F7F8FC] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F8FC] pb-28">
+    <div className="min-h-screen bg-bg pb-28">
       <div className="px-5 pt-10 pb-6">
-        <p className="text-xs font-semibold tracking-widest text-blue-600 uppercase mb-1">
+        <p className="text-xs font-semibold tracking-widest text-primary uppercase mb-1">
           Your Profile
         </p>
-        <h1 className="text-3xl font-bold text-slate-900">Static Details</h1>
-        <p className="text-sm text-slate-400 mt-1">
+        <h1 className="text-3xl font-bold text-ink">Static Details</h1>
+        <p className="text-sm text-ink-faint mt-1">
           Facts that don&apos;t change day to day, but help us understand your data better.
         </p>
       </div>

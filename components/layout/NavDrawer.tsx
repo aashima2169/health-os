@@ -35,16 +35,16 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
     <>
       <div
         onClick={onClose}
-        className={`fixed inset-0 bg-slate-900/30 z-40 transition-opacity duration-200
+        className={`fixed inset-0 bg-ink/30 z-40 transition-opacity duration-200
           ${open ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       />
       <div
         className={`fixed bottom-0 left-0 right-0 z-50 max-w-lg mx-auto
-          bg-white rounded-t-3xl shadow-lg px-4 pt-3 pb-8
+          bg-surface rounded-t-3xl shadow-lg px-4 pt-3 pb-8
           transition-transform duration-200 ease-out
           ${open ? 'translate-y-0' : 'translate-y-full pointer-events-none'}`}
       >
-        <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-4" />
+        <div className="w-10 h-1 bg-line rounded-full mx-auto mb-4" />
 
         <div className="space-y-2">
           {ITEMS.map((item) => (
@@ -52,16 +52,16 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
               key={item.href}
               href={item.href}
               onClick={onClose}
-              className="flex items-center justify-between bg-slate-50 rounded-2xl px-4 py-3.5"
+              className="flex items-center justify-between bg-surface-alt rounded-2xl px-4 py-3.5"
             >
               <div className="flex items-center gap-3">
                 <span className="text-xl">{item.emoji}</span>
                 <div>
-                  <p className="font-semibold text-[15px] text-slate-900">{item.label}</p>
-                  <p className="text-xs text-slate-400">{item.subtitle}</p>
+                  <p className="font-semibold text-[15px] text-ink">{item.label}</p>
+                  <p className="text-xs text-ink-faint">{item.subtitle}</p>
                 </div>
               </div>
-              <svg className="w-4 h-4 text-slate-400" viewBox="0 0 16 16" fill="none">
+              <svg className="w-4 h-4 text-ink-faint" viewBox="0 0 16 16" fill="none">
                 <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </Link>
@@ -71,8 +71,8 @@ export default function NavDrawer({ open, onClose }: NavDrawerProps) {
             type="button"
             onClick={handleSignOut}
             disabled={signingOut}
-            className="w-full bg-slate-50 rounded-2xl px-4 py-3.5 text-left text-sm
-              font-semibold text-red-500 disabled:opacity-50"
+            className="w-full bg-surface-alt rounded-2xl px-4 py-3.5 text-left text-sm
+              font-semibold text-flare disabled:opacity-50"
           >
             {signingOut ? 'Signing out…' : 'Sign Out'}
           </button>

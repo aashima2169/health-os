@@ -43,7 +43,7 @@ export default function DemographicsSection({
     >
       <div className="space-y-5">
         <div>
-          <p className="text-sm font-medium text-slate-500 mb-2">Gender</p>
+          <p className="text-sm font-medium text-ink-soft mb-2">Gender</p>
           <div className="grid grid-cols-2 gap-2">
             {GENDER_OPTIONS.map((opt) => (
               <button
@@ -52,8 +52,8 @@ export default function DemographicsSection({
                 onClick={() => onGenderChange(gender === opt.value ? null : opt.value)}
                 className={`h-11 rounded-xl text-sm font-medium transition-all duration-150
                   ${gender === opt.value
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-slate-50 text-slate-700 border border-slate-200 hover:border-blue-300'
+                    ? 'bg-primary text-white shadow-sm'
+                    : 'bg-surface-alt text-ink border border-line hover:border-primary/50'
                   }`}
               >
                 {opt.label}
@@ -64,7 +64,7 @@ export default function DemographicsSection({
 
         {gender === 'female' && (
           <div>
-            <p className="text-sm font-medium text-slate-500 mb-2">Menstruating status</p>
+            <p className="text-sm font-medium text-ink-soft mb-2">Menstruating status</p>
             <div className="flex gap-2">
               {MENSTRUATING_OPTIONS.map((opt) => (
                 <button
@@ -73,8 +73,8 @@ export default function DemographicsSection({
                   onClick={() => onMenstruatingStatusChange(menstruatingStatus === opt.value ? null : opt.value)}
                   className={`flex-1 h-11 rounded-xl text-sm font-medium transition-all duration-150
                     ${menstruatingStatus === opt.value
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-slate-50 text-slate-700 border border-slate-200 hover:border-blue-300'
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'bg-surface-alt text-ink border border-line hover:border-primary/50'
                     }`}
                 >
                   {opt.label}
@@ -87,15 +87,15 @@ export default function DemographicsSection({
         <NumericInput label="Age" value={age} onChange={onAgeChange} step={1} min={0} max={120} unit="yrs" />
 
         <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-slate-500">City</label>
+          <label className="text-sm font-medium text-ink-soft">City</label>
           <input
             type="text"
             value={city}
             onChange={(e) => onCityChange(e.target.value)}
             placeholder="e.g. Mumbai"
-            className="w-full h-12 px-4 rounded-xl border border-slate-200 bg-slate-50
-              text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500
-              focus:border-transparent placeholder:text-slate-300"
+            className="w-full h-12 px-4 rounded-xl border border-line bg-surface-alt
+              text-ink text-sm focus:outline-none focus:ring-2 focus:ring-primary
+              focus:border-transparent placeholder:text-ink-faint"
           />
         </div>
 
@@ -103,7 +103,7 @@ export default function DemographicsSection({
           type="button"
           onClick={onSave}
           disabled={saving}
-          className="w-full h-12 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-50"
+          className="w-full h-12 rounded-xl bg-primary text-white text-sm font-semibold disabled:opacity-50"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>

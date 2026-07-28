@@ -30,7 +30,7 @@ export default function SupplementsSection({ selected, onChange }: SupplementsSe
       completed={completed}
       microcopy="Consistency adds up over time."
     >
-      <p className="text-xs text-slate-400 mb-3">Tap everything you took today</p>
+      <p className="text-xs text-ink-faint mb-3">Tap everything you took today</p>
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => (
           <Chip

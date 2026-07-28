@@ -43,7 +43,7 @@ export default function DietItemsSettings() {
   if (loading) {
     return (
       <div className="flex justify-center py-8">
-        <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     )
   }
@@ -82,31 +82,31 @@ function MealItemGroup({
   const [open, setOpen] = useState(false)
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+    <div className="bg-surface rounded-2xl border border-line shadow-sm overflow-hidden">
       <button type="button" className="w-full flex items-center justify-between px-5 py-4"
         onClick={() => setOpen((o) => !o)}>
         <div className="flex items-center gap-3">
           <span className="text-xl">{emoji}</span>
           <div className="text-left">
-            <p className="font-semibold text-[15px] text-slate-900">{label}</p>
-            <p className="text-xs text-slate-400">{items.length} saved items</p>
+            <p className="font-semibold text-[15px] text-ink">{label}</p>
+            <p className="text-xs text-ink-faint">{items.length} saved items</p>
           </div>
         </div>
-        <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        <svg className={`w-4 h-4 text-ink-faint transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
           viewBox="0 0 16 16" fill="none">
           <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>
 
       {open && (
-        <div className="px-5 pb-5 border-t border-slate-100 pt-4 space-y-3">
+        <div className="px-5 pb-5 border-t border-line pt-4 space-y-3">
           <div className="flex flex-wrap gap-2">
             {items.map((item) => (
-              <div key={item} className="flex items-center gap-1.5 bg-slate-50 border
-                border-slate-200 rounded-full px-3 py-1.5">
-                <span className="text-sm text-slate-700">{item}</span>
+              <div key={item} className="flex items-center gap-1.5 bg-surface-alt border
+                border-line rounded-full px-3 py-1.5">
+                <span className="text-sm text-ink">{item}</span>
                 <button type="button" onClick={() => onDelete(item)}
-                  className="w-4 h-4 text-slate-400 hover:text-red-500 flex items-center
+                  className="w-4 h-4 text-ink-faint hover:text-flare flex items-center
                     justify-center transition-colors">
                   <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3">
                     <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -122,18 +122,18 @@ function MealItemGroup({
               onChange={(e) => onNewValueChange(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') onAdd() }}
               placeholder={`Add a ${label.toLowerCase()} item…`}
-              className="flex-1 h-11 px-4 rounded-xl border border-slate-200 bg-slate-50
-                text-sm text-slate-900 placeholder:text-slate-300
-                focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 h-11 px-4 rounded-xl border border-line bg-surface-alt
+                text-sm text-ink placeholder:text-ink-faint
+                focus:outline-none focus:ring-2 focus:ring-primary"
             />
             <button type="button" onClick={onAdd} disabled={!newValue.trim()}
-              className="h-11 px-4 bg-blue-600 text-white rounded-xl text-sm font-semibold
+              className="h-11 px-4 bg-primary text-white rounded-xl text-sm font-semibold
                 disabled:opacity-40 transition-opacity">
               Add
             </button>
           </div>
 
-          <p className="text-[11px] text-slate-400 pt-1">
+          <p className="text-[11px] text-ink-faint pt-1">
             These appear as quick-add chips in the Diet section. Tap one while logging
             and just type the quantity after it — e.g. tap "Roti" then type "- 2".
           </p>

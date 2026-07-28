@@ -19,7 +19,11 @@ export const maxDuration = 280
 
 function normalizeBoard(raw: Awaited<ReturnType<typeof getSpecialistBoardSnapshot>>) {
   const flatten = (row: AgentInsightRow | null) => {
-    if (!row) return { status: 'generating' as const, has_data: false }
+    // No row at all means this specialist has never run — genuinely
+    // different from 'generating' (actively computing right now), which
+    // otherwise reads as a stuck/broken loading state for a brand new
+    // user who's simply never tapped Refresh yet.
+    if (!row) return { status: 'not_generated' as const, has_data: false }
     if (row.status === 'success') return { status: 'success' as const, ...row.result }
     return { status: row.status, has_data: false, error: row.error ?? undefined }
   }

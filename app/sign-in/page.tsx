@@ -24,13 +24,13 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F8FC] flex items-center justify-center px-6">
-      <div className="w-full max-w-sm bg-white rounded-3xl border border-slate-100 shadow-sm px-6 py-10 text-center">
-        <p className="text-xs font-semibold tracking-widest text-blue-600 uppercase mb-2">
+    <div className="min-h-screen bg-bg flex items-center justify-center px-6">
+      <div className="w-full max-w-sm bg-surface rounded-3xl border border-line shadow-sm px-6 py-10 text-center">
+        <p className="text-xs font-semibold tracking-widest text-primary uppercase mb-2">
           Flarewise
         </p>
-        <h1 className="text-2xl font-bold text-slate-900 mb-2">Your health journey, understood</h1>
-        <p className="text-sm text-slate-500 leading-5 mb-8">
+        <h1 className="text-2xl font-bold text-ink mb-2">Your health journey, understood</h1>
+        <p className="text-sm text-ink-soft leading-5 mb-8">
           Sign in to continue tracking patterns over time.
         </p>
 
@@ -38,12 +38,12 @@ export default function SignInPage() {
           type="button"
           onClick={handleSignIn}
           disabled={loading}
-          className="w-full h-12 rounded-2xl border border-slate-200 bg-white text-slate-700
+          className="w-full h-12 rounded-2xl border border-line bg-surface text-ink
             text-sm font-semibold flex items-center justify-center gap-3
-            hover:border-slate-300 transition-colors disabled:opacity-50"
+            hover:border-line transition-colors disabled:opacity-50"
         >
           {loading ? (
-            <span className="w-4 h-4 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
+            <span className="w-4 h-4 border-2 border-line border-t-transparent rounded-full animate-spin" />
           ) : (
             <>
               <svg className="w-4 h-4" viewBox="0 0 20 20">
@@ -57,9 +57,9 @@ export default function SignInPage() {
           )}
         </button>
 
-        {error && <p className="text-xs text-red-500 mt-4">{error}</p>}
+        {error && <p className="text-xs text-flare mt-4">{error}</p>}
 
-        <p className="text-xs text-slate-300 mt-8 leading-4">
+        <p className="text-xs text-ink-faint mt-8 leading-4">
           Your health journey stays private to your account.
         </p>
       </div>

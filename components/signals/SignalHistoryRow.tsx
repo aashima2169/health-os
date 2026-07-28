@@ -8,10 +8,10 @@
 import { Signal, SignalStatus } from '../../types/signals'
 
 const STATUS_INFO: Record<SignalStatus, { label: string; className: string }> = {
-  active: { label: 'Active', className: 'bg-blue-50 text-blue-600' },
-  needs_more_data: { label: 'Needs more data', className: 'bg-amber-50 text-amber-600' },
-  resolved: { label: 'Confirmed', className: 'bg-emerald-50 text-emerald-600' },
-  dismissed: { label: 'Dismissed', className: 'bg-slate-100 text-slate-500' },
+  active: { label: 'Active', className: 'bg-intelligence-soft text-intelligence' },
+  needs_more_data: { label: 'Needs more data', className: 'bg-caution-soft text-caution' },
+  resolved: { label: 'Confirmed', className: 'bg-primary-soft text-primary' },
+  dismissed: { label: 'Dismissed', className: 'bg-surface-alt text-ink-soft' },
 }
 
 function BoldText({ text }: { text: string }) {
@@ -20,7 +20,7 @@ function BoldText({ text }: { text: string }) {
     <>
       {parts.map((part, i) =>
         part.startsWith('**') && part.endsWith('**')
-          ? <strong key={i} className="font-semibold text-slate-900">{part.slice(2, -2)}</strong>
+          ? <strong key={i} className="font-semibold text-ink">{part.slice(2, -2)}</strong>
           : <span key={i}>{part}</span>
       )}
     </>
@@ -38,16 +38,16 @@ export default function SignalHistoryRow({ signal, onReopen, busy }: SignalHisto
   const canReopen = signal.status === 'resolved' || signal.status === 'dismissed'
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-4 py-3">
+    <div className="bg-surface rounded-2xl border border-line shadow-sm px-4 py-3">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium text-slate-800 flex-1 leading-5">
+        <p className="text-sm font-medium text-ink flex-1 leading-5">
           <BoldText text={signal.title} />
         </p>
         <span className={`text-[10px] font-semibold rounded-full px-2 py-1 flex-shrink-0 ${statusInfo.className}`}>
           {statusInfo.label}
         </span>
       </div>
-      <p className="text-xs text-slate-400 mt-1.5">
+      <p className="text-xs text-ink-faint mt-1.5">
         {signal.confidence}% confidence · {new Date(signal.first_generated_at).toLocaleDateString('en-IN', {
           day: 'numeric', month: 'short', year: 'numeric',
         })}
@@ -57,7 +57,7 @@ export default function SignalHistoryRow({ signal, onReopen, busy }: SignalHisto
           type="button"
           onClick={() => onReopen(signal.id)}
           disabled={busy}
-          className="mt-2 text-xs font-semibold text-blue-600 disabled:opacity-50"
+          className="mt-2 text-xs font-semibold text-intelligence disabled:opacity-50"
         >
           Reopen
         </button>

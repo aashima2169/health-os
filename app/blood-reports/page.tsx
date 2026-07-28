@@ -78,15 +78,15 @@ export default function BloodReportsPage() {
       {/* Header */}
       <div className="px-5 pt-10 pb-6 flex items-end justify-between">
         <div>
-          <p className="text-xs font-semibold tracking-widest text-blue-600 uppercase mb-1">
+          <p className="text-xs font-semibold tracking-widest text-primary uppercase mb-1">
             Blood Reports
           </p>
-          <h1 className="text-3xl font-bold text-slate-900">Lab Results</h1>
+          <h1 className="text-3xl font-bold text-ink">Lab Results</h1>
         </div>
         <button
           type="button"
           onClick={() => setShowUpload((s) => !s)}
-          className="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center shadow-md shadow-blue-200"
+          className="w-9 h-9 bg-primary rounded-full flex items-center justify-center shadow-md shadow-primary/25"
         >
           <svg className="w-5 h-5 text-white" viewBox="0 0 20 20" fill="none">
             <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -97,12 +97,12 @@ export default function BloodReportsPage() {
       <div className="px-4 space-y-3">
         {/* Upload panel */}
         {showUpload && (
-          <div className="bg-white rounded-2xl border border-blue-100 shadow-sm px-5 py-5">
-            <p className="font-semibold text-slate-900 mb-4">Upload New Report</p>
+          <div className="bg-surface rounded-2xl border border-primary/20 shadow-sm px-5 py-5">
+            <p className="font-semibold text-ink mb-4">Upload New Report</p>
 
             {/* Date */}
             <div className="mb-3">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+              <label className="text-xs font-semibold text-ink-soft uppercase tracking-wide block mb-1.5">
                 Date tests were done
               </label>
               <input
@@ -111,34 +111,34 @@ export default function BloodReportsPage() {
                 onChange={(e) => setReportDate(e.target.value)}
                 max={new Date().toISOString().split('T')[0]}
                 className="
-                  w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50
-                  text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500
+                  w-full h-11 px-4 rounded-xl border border-line bg-surface-alt
+                  text-ink text-sm focus:outline-none focus:ring-2 focus:ring-primary
                 "
               />
             </div>
 
             {/* File picker */}
             <div className="mb-3">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+              <label className="text-xs font-semibold text-ink-soft uppercase tracking-wide block mb-1.5">
                 PDF file
               </label>
               <div
                 onClick={() => fileInputRef.current?.click()}
                 className="
-                  w-full h-20 rounded-xl border-2 border-dashed border-slate-200
+                  w-full h-20 rounded-xl border-2 border-dashed border-line
                   flex flex-col items-center justify-center gap-1 cursor-pointer
-                  hover:border-blue-400 transition-colors
+                  hover:border-primary transition-colors
                 "
               >
                 {selectedFile ? (
                   <>
                     <span className="text-2xl">📄</span>
-                    <span className="text-sm text-slate-700 font-medium">{selectedFile.name}</span>
+                    <span className="text-sm text-ink font-medium">{selectedFile.name}</span>
                   </>
                 ) : (
                   <>
                     <span className="text-2xl">⬆️</span>
-                    <span className="text-sm text-slate-400">Tap to select PDF</span>
+                    <span className="text-sm text-ink-faint">Tap to select PDF</span>
                   </>
                 )}
               </div>
@@ -153,7 +153,7 @@ export default function BloodReportsPage() {
 
             {/* Notes */}
             <div className="mb-4">
-              <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+              <label className="text-xs font-semibold text-ink-soft uppercase tracking-wide block mb-1.5">
                 Notes (optional)
               </label>
               <input
@@ -162,15 +162,15 @@ export default function BloodReportsPage() {
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="e.g. Fasting report, Apollo Diagnostics"
                 className="
-                  w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50
-                  text-slate-900 text-sm placeholder:text-slate-300
-                  focus:outline-none focus:ring-2 focus:ring-blue-500
+                  w-full h-11 px-4 rounded-xl border border-line bg-surface-alt
+                  text-ink text-sm placeholder:text-ink-faint
+                  focus:outline-none focus:ring-2 focus:ring-primary
                 "
               />
             </div>
 
             {uploadError && (
-              <p className="text-sm text-red-500 mb-3">{uploadError}</p>
+              <p className="text-sm text-flare mb-3">{uploadError}</p>
             )}
 
             <button
@@ -178,7 +178,7 @@ export default function BloodReportsPage() {
               onClick={handleUpload}
               disabled={uploading}
               className="
-                w-full h-12 rounded-xl bg-blue-600 text-white font-semibold text-sm
+                w-full h-12 rounded-xl bg-primary text-white font-semibold text-sm
                 disabled:opacity-60 transition-opacity
               "
             >
@@ -193,7 +193,7 @@ export default function BloodReportsPage() {
             </button>
 
             {uploading && (
-              <p className="text-xs text-slate-400 text-center mt-2">
+              <p className="text-xs text-ink-faint text-center mt-2">
                 Gemini is reading your report. This takes 10–20 seconds.
               </p>
             )}
@@ -203,13 +203,13 @@ export default function BloodReportsPage() {
         {/* Reports list */}
         {loading ? (
           <div className="flex justify-center py-16">
-            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : reports.length === 0 ? (
           <div className="text-center py-16">
             <p className="text-4xl mb-3">🩸</p>
-            <p className="font-medium text-slate-700">No reports yet</p>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="font-medium text-ink">No reports yet</p>
+            <p className="text-sm text-ink-faint mt-1">
               Tap + above to upload your first blood report.
             </p>
           </div>
@@ -241,7 +241,7 @@ function ReportCard({
   })
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+    <div className="bg-surface rounded-2xl border border-line shadow-sm overflow-hidden">
       <button
         type="button"
         className="w-full flex items-center justify-between px-5 py-4"
@@ -252,8 +252,8 @@ function ReportCard({
             <span className="text-lg">🩸</span>
           </div>
           <div className="text-left">
-            <p className="font-semibold text-[15px] text-slate-900">{displayDate}</p>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="font-semibold text-[15px] text-ink">{displayDate}</p>
+            <p className="text-xs text-ink-faint mt-0.5">
               {markerEntries.length} markers extracted
               {report.notes ? ` · ${report.notes}` : ''}
             </p>
@@ -266,13 +266,13 @@ function ReportCard({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="text-xs text-blue-600 font-medium"
+              className="text-xs text-primary font-medium"
             >
               PDF
             </a>
           )}
           <svg
-            className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 text-ink-faint transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
             viewBox="0 0 16 16" fill="none"
           >
             <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -281,9 +281,9 @@ function ReportCard({
       </button>
 
       {expanded && (
-        <div className="px-5 pb-5 border-t border-slate-100 pt-4">
+        <div className="px-5 pb-5 border-t border-line pt-4">
           {markerEntries.length === 0 ? (
-            <p className="text-sm text-slate-400">No markers could be extracted from this report.</p>
+            <p className="text-sm text-ink-faint">No markers could be extracted from this report.</p>
           ) : (
             <div className="space-y-2">
               {markerEntries.map(([name, data]) => (
@@ -295,7 +295,7 @@ function ReportCard({
           <button
             type="button"
             onClick={onDelete}
-            className="mt-5 text-xs text-red-400 font-medium"
+            className="mt-5 text-xs text-flare font-medium"
           >
             Delete report
           </button>
@@ -329,21 +329,21 @@ function MarkerRow({ name, data }: { name: string; data: MarkerEntry }) {
       : false
 
   return (
-    <div className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+    <div className="flex items-center justify-between py-2 border-b border-line last:border-0">
       <div className="flex items-center gap-2">
         <span
           className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
             isOutOfRange ? 'bg-orange-400' : 'bg-green-400'
           }`}
         />
-        <span className="text-sm text-slate-700">{name}</span>
+        <span className="text-sm text-ink">{name}</span>
       </div>
       <div className="text-right">
-        <span className={`text-sm font-semibold ${isOutOfRange ? 'text-orange-500' : 'text-slate-900'}`}>
+        <span className={`text-sm font-semibold ${isOutOfRange ? 'text-orange-500' : 'text-ink'}`}>
           {data.value} {data.unit}
         </span>
         {data.reference && (
-          <p className="text-[10px] text-slate-400">{data.reference}</p>
+          <p className="text-[10px] text-ink-faint">{data.reference}</p>
         )}
       </div>
     </div>

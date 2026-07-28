@@ -101,7 +101,7 @@ export default function BloodReportsTab() {
         type="button"
         onClick={() => setShowUpload((s) => !s)}
         className="w-full h-12 rounded-2xl border-2 border-dashed border-red-200
-          text-red-500 text-sm font-semibold flex items-center justify-center gap-2"
+          text-flare text-sm font-semibold flex items-center justify-center gap-2"
       >
         <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none">
           <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -110,41 +110,41 @@ export default function BloodReportsTab() {
       </button>
 
       {showUpload && (
-        <div className="bg-white rounded-2xl border border-red-100 shadow-sm px-5 py-5">
-          <p className="font-semibold text-slate-900 mb-4">Upload New Report</p>
+        <div className="bg-surface rounded-2xl border border-flare/20 shadow-sm px-5 py-5">
+          <p className="font-semibold text-ink mb-4">Upload New Report</p>
 
           <div className="mb-3">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+            <label className="text-xs font-semibold text-ink-soft uppercase tracking-wide block mb-1.5">
               Date tests were done
             </label>
             <input
               type="date" value={reportDate}
               onChange={(e) => setReportDate(e.target.value)}
               max={new Date().toISOString().split('T')[0]}
-              className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50
-                text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full h-11 px-4 rounded-xl border border-line bg-surface-alt
+                text-ink text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
           <div className="mb-3">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+            <label className="text-xs font-semibold text-ink-soft uppercase tracking-wide block mb-1.5">
               PDF file
             </label>
             <div
               onClick={() => fileInputRef.current?.click()}
-              className="w-full h-20 rounded-xl border-2 border-dashed border-slate-200
+              className="w-full h-20 rounded-xl border-2 border-dashed border-line
                 flex flex-col items-center justify-center gap-1 cursor-pointer
-                hover:border-blue-400 transition-colors"
+                hover:border-primary transition-colors"
             >
               {selectedFile ? (
                 <>
                   <span className="text-2xl">📄</span>
-                  <span className="text-sm text-slate-700 font-medium">{selectedFile.name}</span>
+                  <span className="text-sm text-ink font-medium">{selectedFile.name}</span>
                 </>
               ) : (
                 <>
                   <span className="text-2xl">⬆️</span>
-                  <span className="text-sm text-slate-400">Tap to select PDF</span>
+                  <span className="text-sm text-ink-faint">Tap to select PDF</span>
                 </>
               )}
             </div>
@@ -155,27 +155,27 @@ export default function BloodReportsTab() {
           </div>
 
           <div className="mb-4">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1.5">
+            <label className="text-xs font-semibold text-ink-soft uppercase tracking-wide block mb-1.5">
               Notes (optional)
             </label>
             <input
               type="text" value={notes} onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Fasting report, Apollo Diagnostics"
-              className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50
-                text-slate-900 text-sm placeholder:text-slate-300
-                focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full h-11 px-4 rounded-xl border border-line bg-surface-alt
+                text-ink text-sm placeholder:text-ink-faint
+                focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
           {uploadError && (
-            <div className="bg-orange-50 border border-orange-100 rounded-xl px-3 py-2.5 mb-3">
+            <div className="bg-caution-soft border border-caution/20 rounded-xl px-3 py-2.5 mb-3">
               <p className="text-xs text-orange-700">{uploadError}</p>
             </div>
           )}
 
           <button
             type="button" onClick={handleUpload} disabled={uploading}
-            className="w-full h-12 rounded-xl bg-blue-600 text-white font-semibold text-sm
+            className="w-full h-12 rounded-xl bg-primary text-white font-semibold text-sm
               disabled:opacity-60 transition-opacity"
           >
             {uploading ? (
@@ -187,7 +187,7 @@ export default function BloodReportsTab() {
           </button>
 
           {uploading && (
-            <p className="text-xs text-slate-400 text-center mt-2">
+            <p className="text-xs text-ink-faint text-center mt-2">
               Gemini is reading your report. This takes 10–20 seconds.
             </p>
           )}
@@ -196,13 +196,13 @@ export default function BloodReportsTab() {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : reports.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-4xl mb-3">🩸</p>
-          <p className="font-medium text-slate-700">No reports yet</p>
-          <p className="text-sm text-slate-400 mt-1">Tap above to upload your first blood report.</p>
+          <p className="font-medium text-ink">No reports yet</p>
+          <p className="text-sm text-ink-faint mt-1">Tap above to upload your first blood report.</p>
         </div>
       ) : (
         reports.map((report) => (
@@ -238,18 +238,18 @@ function ReportCard({
   })
 
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden
-      ${isFailed ? 'border-orange-200' : 'border-slate-100'}`}>
+    <div className={`bg-surface rounded-2xl border shadow-sm overflow-hidden
+      ${isFailed ? 'border-orange-200' : 'border-line'}`}>
       <button type="button" className="w-full flex items-center justify-between px-5 py-4"
         onClick={() => setExpanded((e) => !e)}>
         <div className="flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0
-            ${isFailed ? 'bg-orange-50' : 'bg-red-50'}`}>
+            ${isFailed ? 'bg-caution-soft' : 'bg-flare-soft'}`}>
             <span className="text-lg">{isFailed ? '⚠️' : '🩸'}</span>
           </div>
           <div className="text-left">
-            <p className="font-semibold text-[15px] text-slate-900">{displayDate}</p>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="font-semibold text-[15px] text-ink">{displayDate}</p>
+            <p className="text-xs text-ink-faint mt-0.5">
               {isRetrying
                 ? 'Retrying extraction…'
                 : isFailed
@@ -262,11 +262,11 @@ function ReportCard({
         <div className="flex items-center gap-3">
           {report.file_url && (
             <a href={report.file_url} target="_blank" rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()} className="text-xs text-blue-600 font-medium">
+              onClick={(e) => e.stopPropagation()} className="text-xs text-primary font-medium">
               PDF
             </a>
           )}
-          <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          <svg className={`w-4 h-4 text-ink-faint transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
             viewBox="0 0 16 16" fill="none">
             <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -274,9 +274,9 @@ function ReportCard({
       </button>
 
       {expanded && (
-        <div className="px-5 pb-5 border-t border-slate-100 pt-4">
+        <div className="px-5 pb-5 border-t border-line pt-4">
           {isFailed && (
-            <div className="bg-orange-50 border border-orange-100 rounded-xl px-3 py-3 mb-4">
+            <div className="bg-caution-soft border border-caution/20 rounded-xl px-3 py-3 mb-4">
               <p className="text-xs text-orange-700 mb-2">
                 {extractionErrorMsg || 'No markers could be extracted from this report.'}
               </p>
@@ -284,7 +284,7 @@ function ReportCard({
                 type="button"
                 onClick={onRetry}
                 disabled={isRetrying}
-                className="text-xs font-semibold text-orange-700 bg-white border border-orange-200
+                className="text-xs font-semibold text-orange-700 bg-surface border border-orange-200
                   rounded-full px-3 py-1.5 disabled:opacity-50 flex items-center gap-1.5"
               >
                 {isRetrying ? (
@@ -307,7 +307,7 @@ function ReportCard({
             </div>
           )}
 
-          <button type="button" onClick={onDelete} className="mt-5 text-xs text-red-400 font-medium">
+          <button type="button" onClick={onDelete} className="mt-5 text-xs text-flare font-medium">
             Delete report
           </button>
         </div>
@@ -326,16 +326,16 @@ function MarkerRow({ name, data }: { name: string; data: MarkerEntry }) {
   })() : false
 
   return (
-    <div className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+    <div className="flex items-center justify-between py-2 border-b border-line last:border-0">
       <div className="flex items-center gap-2">
         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isOutOfRange ? 'bg-orange-400' : 'bg-green-400'}`} />
-        <span className="text-sm text-slate-700">{name}</span>
+        <span className="text-sm text-ink">{name}</span>
       </div>
       <div className="text-right">
-        <span className={`text-sm font-semibold ${isOutOfRange ? 'text-orange-500' : 'text-slate-900'}`}>
+        <span className={`text-sm font-semibold ${isOutOfRange ? 'text-caution' : 'text-ink'}`}>
           {data.value} {data.unit}
         </span>
-        {data.reference && <p className="text-[10px] text-slate-400">{data.reference}</p>}
+        {data.reference && <p className="text-[10px] text-ink-faint">{data.reference}</p>}
       </div>
     </div>
   )

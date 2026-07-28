@@ -26,8 +26,8 @@ export default function SectionCard({
 
   return (
     <div className={`
-      bg-white rounded-2xl shadow-sm border transition-all duration-200
-      ${completed ? 'border-blue-100' : 'border-slate-100'}
+      bg-surface rounded-2xl shadow-sm border transition-all duration-200
+      ${completed ? 'border-primary/25' : 'border-line'}
     `}>
       <button
         type="button"
@@ -38,7 +38,7 @@ export default function SectionCard({
           {/* Completion indicator */}
           <span className={`
             w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center transition-all
-            ${completed ? 'bg-blue-600' : 'border-2 border-slate-200'}
+            ${completed ? 'bg-primary' : 'border-2 border-line'}
           `}>
             {completed && (
               <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
@@ -49,21 +49,21 @@ export default function SectionCard({
           </span>
 
           <div>
-            <p className="font-semibold text-slate-900 text-[15px] flex items-center gap-1.5 leading-6">
+            <p className="font-display font-semibold text-ink text-[16px] flex items-center gap-1.5 leading-6">
               {titleEmoji && <span className="text-base leading-6">{titleEmoji}</span>}
               <span>{title}</span>
             </p>
             {!open && subtitle && (
-              <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+              <p className="text-xs text-ink-faint mt-0.5">{subtitle}</p>
             )}
             {!open && completed && microcopy && (
-              <p className="text-xs text-blue-500 mt-0.5 font-medium">{microcopy}</p>
+              <p className="text-xs text-primary mt-0.5 font-medium">{microcopy}</p>
             )}
           </div>
         </div>
 
         <svg
-          className={`w-4 h-4 text-slate-400 transition-transform duration-200 flex-shrink-0
+          className={`w-4 h-4 text-ink-faint transition-transform duration-200 flex-shrink-0
             ${open ? 'rotate-180' : ''}`}
           viewBox="0 0 16 16" fill="none"
         >
@@ -74,7 +74,7 @@ export default function SectionCard({
 
       {open && (
         <div className="px-5 pb-5 pt-1">
-          <div className="w-full h-px bg-slate-100 mb-4" />
+          <div className="w-full h-px bg-line mb-4" />
           {children}
         </div>
       )}

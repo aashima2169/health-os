@@ -21,43 +21,43 @@ export default function HealthEventsPage() {
   const [tab, setTab] = useState<Tab>('events')
 
   return (
-    <div className="min-h-screen bg-[#F7F8FC] pb-28">
+    <div className="min-h-screen bg-bg pb-28">
       <div className="px-5 pt-10 pb-5">
-        <p className="text-xs font-semibold tracking-widest text-blue-600 uppercase mb-1">
+        <p className="text-xs font-semibold tracking-widest text-primary uppercase mb-1">
           Health Events
         </p>
-        <h1 className="text-3xl font-bold text-slate-900">Events & Cycle</h1>
-        <p className="text-sm text-slate-400 mt-1">Flares, periods, photos, blood reports</p>
+        <h1 className="text-3xl font-bold text-ink">Events & Cycle</h1>
+        <p className="text-sm text-ink-faint mt-1">Flares, periods, photos, blood reports</p>
       </div>
 
       {/* Tab switcher */}
       <div className="px-4 mb-4">
-        <div className="bg-white rounded-2xl border border-slate-100 p-1 flex shadow-sm overflow-x-auto">
+        <div className="bg-surface rounded-2xl border border-line p-1 flex shadow-sm overflow-x-auto">
           <button
             onClick={() => setTab('events')}
             className={`flex-1 h-10 rounded-xl text-xs font-semibold transition-all whitespace-nowrap px-2
-              ${tab === 'events' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500'}`}
+              ${tab === 'events' ? 'bg-primary text-white shadow-sm' : 'text-ink-soft'}`}
           >
             ⚡ Events
           </button>
           <button
             onClick={() => setTab('periods')}
             className={`flex-1 h-10 rounded-xl text-xs font-semibold transition-all whitespace-nowrap px-2
-              ${tab === 'periods' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500'}`}
+              ${tab === 'periods' ? 'bg-primary text-white shadow-sm' : 'text-ink-soft'}`}
           >
             🌸 Periods
           </button>
           <button
             onClick={() => setTab('photos')}
             className={`flex-1 h-10 rounded-xl text-xs font-semibold transition-all whitespace-nowrap px-2
-              ${tab === 'photos' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500'}`}
+              ${tab === 'photos' ? 'bg-primary text-white shadow-sm' : 'text-ink-soft'}`}
           >
             📸 Photos
           </button>
           <button
             onClick={() => setTab('blood')}
             className={`flex-1 h-10 rounded-xl text-xs font-semibold transition-all whitespace-nowrap px-2
-              ${tab === 'blood' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-500'}`}
+              ${tab === 'blood' ? 'bg-primary text-white shadow-sm' : 'text-ink-soft'}`}
           >
             🩸 Lab Reports
           </button>
@@ -161,8 +161,8 @@ function EventsTab() {
     <div className="px-4 space-y-3">
       <button
         onClick={() => (showForm ? resetForm() : setShowForm(true))}
-        className="w-full h-12 rounded-2xl border-2 border-dashed border-blue-200
-          text-blue-600 text-sm font-semibold flex items-center justify-center gap-2"
+        className="w-full h-12 rounded-2xl border-2 border-dashed border-primary/30
+          text-primary text-sm font-semibold flex items-center justify-center gap-2"
       >
         <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none">
           <path d="M10 4v12M4 10h12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -171,13 +171,13 @@ function EventsTab() {
       </button>
 
       {showForm && (
-        <div className="bg-white rounded-2xl border border-blue-100 shadow-sm px-5 py-5">
-          <p className="font-semibold text-slate-900 mb-4">
+        <div className="bg-surface rounded-2xl border border-primary/20 shadow-sm px-5 py-5">
+          <p className="font-semibold text-ink mb-4">
             {editingId ? 'Edit Health Event' : 'Log Health Event'}
           </p>
 
           <div className="mb-4">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-2">
               What happened?
             </p>
             <div className="flex flex-wrap gap-2">
@@ -193,14 +193,14 @@ function EventsTab() {
                 type="text" value={customType}
                 onChange={(e) => setCustomType(e.target.value)}
                 placeholder="Describe the event…"
-                className="mt-3 w-full h-11 px-4 rounded-xl border border-slate-200
-                  bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="mt-3 w-full h-11 px-4 rounded-xl border border-line
+                  bg-surface-alt text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             )}
           </div>
 
           <div className="mb-4">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-2">
               Status
             </p>
             <div className="flex gap-2">
@@ -208,8 +208,8 @@ function EventsTab() {
                 <button key={s} type="button" onClick={() => setStatus(s)}
                   className={`flex-1 h-10 rounded-xl text-sm font-semibold capitalize
                     transition-all ${status === s
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-50 border border-slate-200 text-slate-600'}`}>
+                      ? 'bg-primary text-white'
+                      : 'bg-surface-alt border border-line text-ink-soft'}`}>
                   {s === 'new' ? '🆕 New' : '🔄 Existing'}
                 </button>
               ))}
@@ -218,18 +218,18 @@ function EventsTab() {
 
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <p className="text-xs font-medium text-slate-500 mb-1.5">Start date *</p>
+              <p className="text-xs font-medium text-ink-soft mb-1.5">Start date *</p>
               <input type="date" value={startDate} max={today}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50
-                  text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full h-11 px-3 rounded-xl border border-line bg-surface-alt
+                  text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500 mb-1.5">End date</p>
+              <p className="text-xs font-medium text-ink-soft mb-1.5">End date</p>
               <input type="date" value={endDate} min={startDate} max={today}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50
-                  text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full h-11 px-3 rounded-xl border border-line bg-surface-alt
+                  text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
             </div>
           </div>
 
@@ -238,7 +238,7 @@ function EventsTab() {
           </div>
 
           <div className="mb-4">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+            <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-2">
               Body location (optional)
             </p>
             <div className="flex flex-wrap gap-2">
@@ -251,25 +251,25 @@ function EventsTab() {
           </div>
 
           <div className="mb-4">
-            <p className="text-xs font-medium text-slate-500 mb-1.5">Notes (optional)</p>
+            <p className="text-xs font-medium text-ink-soft mb-1.5">Notes (optional)</p>
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
               placeholder="Any details worth remembering…" rows={2}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50
-                text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className="w-full px-3 py-2.5 rounded-xl border border-line bg-surface-alt
+                text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary" />
           </div>
 
-          <p className="text-xs text-slate-400 mb-4 bg-slate-50 rounded-xl px-3 py-2.5">
+          <p className="text-xs text-ink-faint mb-4 bg-surface-alt rounded-xl px-3 py-2.5">
             📸 You can add photos of the flare right after saving — the event card
             below will have a photo upload button once it's created.
           </p>
 
           <div className="flex gap-2">
             <button onClick={resetForm}
-              className="flex-1 h-12 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold">
+              className="flex-1 h-12 rounded-xl border border-line text-ink-soft text-sm font-semibold">
               Cancel
             </button>
             <button onClick={handleSave} disabled={saving || !startDate}
-              className="flex-1 h-12 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-50">
+              className="flex-1 h-12 rounded-xl bg-primary text-white text-sm font-semibold disabled:opacity-50">
               {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Save Event'}
             </button>
           </div>
@@ -278,13 +278,13 @@ function EventsTab() {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : events.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-4xl mb-3">📋</p>
-          <p className="font-medium text-slate-700">No events logged yet</p>
-          <p className="text-sm text-slate-400 mt-1">Tap above to log a flare, migraine, or any health event.</p>
+          <p className="font-medium text-ink">No events logged yet</p>
+          <p className="text-sm text-ink-faint mt-1">Tap above to log a flare, migraine, or any health event.</p>
         </div>
       ) : (
         events.map((event) => (
@@ -323,48 +323,50 @@ function EventCard({ event, onEdit, onDelete }: { event: HealthEvent; onEdit: ()
   const startDisplay = new Date(event.start_date + 'T00:00:00')
     .toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
 
+  // Actual flare severity — the one place the flare/rust token is meant to
+  // be used, escalating through the caution/flare pair rather than a
+  // generic traffic-light gradient.
   const SEVERITY_LABELS = ['', 'Mild', 'Low', 'Moderate', 'High', 'Severe']
-  const SEVERITY_COLORS = ['', 'text-green-600', 'text-lime-600', 'text-yellow-600',
-    'text-orange-600', 'text-red-600']
+  const SEVERITY_COLORS = ['', 'text-caution/80', 'text-caution', 'text-flare/70', 'text-flare/85', 'text-flare']
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+    <div className="bg-surface rounded-2xl border border-line shadow-sm overflow-hidden">
       <button type="button" onClick={() => setExpanded((e) => !e)}
         className="w-full flex items-center justify-between px-5 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center">
+          <div className="w-10 h-10 bg-flare-soft rounded-xl flex items-center justify-center">
             <span className="text-lg">⚡</span>
           </div>
           <div className="text-left">
-            <p className="font-semibold text-[15px] text-slate-900">{event.event_type}</p>
+            <p className="font-semibold text-[15px] text-ink">{event.event_type}</p>
             <div className="flex items-center gap-2 mt-0.5">
-              <span className="text-xs text-slate-400">{startDisplay}</span>
+              <span className="text-xs text-ink-faint">{startDisplay}</span>
               {event.severity && (
                 <span className={`text-xs font-semibold ${SEVERITY_COLORS[event.severity]}`}>
                   · {SEVERITY_LABELS[event.severity]}
                 </span>
               )}
               {event.status === 'new' && (
-                <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">
+                <span className="text-[10px] bg-primary-soft text-primary px-1.5 py-0.5 rounded-full font-medium">
                   New
                 </span>
               )}
               {photos.length > 0 && (
-                <span className="text-[10px] bg-purple-50 text-purple-600 px-1.5 py-0.5 rounded-full font-medium">
+                <span className="text-[10px] bg-surface-alt text-ink-soft px-1.5 py-0.5 rounded-full font-medium">
                   📸 {photos.length}
                 </span>
               )}
             </div>
           </div>
         </div>
-        <svg className={`w-4 h-4 text-slate-400 transition-transform duration-200
+        <svg className={`w-4 h-4 text-ink-faint transition-transform duration-200
           ${expanded ? 'rotate-180' : ''}`} viewBox="0 0 16 16" fill="none">
           <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       </button>
 
       {expanded && (
-        <div className="px-5 pb-5 border-t border-slate-100 pt-4 space-y-3">
+        <div className="px-5 pb-5 border-t border-line pt-4 space-y-3">
           {event.body_location && <DetailRow label="Location" value={event.body_location} />}
           {event.end_date && (
             <DetailRow label="Ended" value={new Date(event.end_date + 'T00:00:00')
@@ -374,22 +376,22 @@ function EventCard({ event, onEdit, onDelete }: { event: HealthEvent; onEdit: ()
 
           {/* Photo upload — this is where flare photos go */}
           <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">
+            <p className="text-xs font-semibold text-ink-faint uppercase tracking-wide mb-2">
               Photos
             </p>
             <div className="flex gap-2 flex-wrap">
               {photos.map((p) => (
                 <a key={p.id} href={p.photo_url} target="_blank" rel="noopener noreferrer">
                   <img src={p.photo_url} alt="event photo"
-                    className="w-16 h-16 object-cover rounded-xl border border-slate-200" />
+                    className="w-16 h-16 object-cover rounded-xl border border-line" />
                 </a>
               ))}
               <button onClick={() => fileRef.current?.click()} disabled={uploading}
-                className="w-16 h-16 rounded-xl border-2 border-dashed border-blue-200
-                  flex flex-col items-center justify-center gap-0.5 text-blue-400
-                  hover:border-blue-400 hover:bg-blue-50 transition-colors disabled:opacity-50">
+                className="w-16 h-16 rounded-xl border-2 border-dashed border-primary/30
+                  flex flex-col items-center justify-center gap-0.5 text-primary/60
+                  hover:border-primary hover:bg-primary-soft transition-colors disabled:opacity-50">
                 {uploading ? (
-                  <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
                     <svg className="w-4 h-4" viewBox="0 0 20 20" fill="none">
@@ -405,10 +407,10 @@ function EventCard({ event, onEdit, onDelete }: { event: HealthEvent; onEdit: ()
           </div>
 
           <div className="flex gap-4 pt-1">
-            <button onClick={onEdit} className="text-xs text-blue-600 font-medium">
+            <button onClick={onEdit} className="text-xs text-primary font-medium">
               Edit event
             </button>
-            <button onClick={onDelete} className="text-xs text-red-400 font-medium">
+            <button onClick={onDelete} className="text-xs text-flare font-medium">
               Delete event
             </button>
           </div>
@@ -514,7 +516,7 @@ function PeriodsTab() {
               setActive(null)
             }}
             className="mt-3 text-xs font-semibold text-rose-600 border border-rose-200
-              px-3 py-1.5 rounded-full bg-white"
+              px-3 py-1.5 rounded-full bg-surface"
           >
             Mark as ended today
           </button>
@@ -522,8 +524,8 @@ function PeriodsTab() {
       )}
 
       {avgCycleLength && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-4">
-          <p className="font-semibold text-slate-900 mb-3">Cycle Summary</p>
+        <div className="bg-surface rounded-2xl border border-line shadow-sm px-5 py-4">
+          <p className="font-semibold text-ink mb-3">Cycle Summary</p>
           <div className="grid grid-cols-3 gap-3">
             <StatBox label="Avg cycle" value={`${avgCycleLength}d`} />
             <StatBox label="Periods logged" value={String(periods.length)} />
@@ -539,34 +541,34 @@ function PeriodsTab() {
       )}
 
       {showForm && (
-        <div className="bg-white rounded-2xl border border-rose-100 shadow-sm px-5 py-5">
-          <p className="font-semibold text-slate-900 mb-4">Log Period</p>
+        <div className="bg-surface rounded-2xl border border-rose-100 shadow-sm px-5 py-5">
+          <p className="font-semibold text-ink mb-4">Log Period</p>
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <p className="text-xs font-medium text-slate-500 mb-1.5">Start date *</p>
+              <p className="text-xs font-medium text-ink-soft mb-1.5">Start date *</p>
               <input type="date" value={startDate} max={today}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50
-                  text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full h-11 px-3 rounded-xl border border-line bg-surface-alt
+                  text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-500 mb-1.5">End date</p>
+              <p className="text-xs font-medium text-ink-soft mb-1.5">End date</p>
               <input type="date" value={endDate} min={startDate} max={today}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full h-11 px-3 rounded-xl border border-slate-200 bg-slate-50
-                  text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full h-11 px-3 rounded-xl border border-line bg-surface-alt
+                  text-sm focus:outline-none focus:ring-2 focus:ring-primary" />
             </div>
           </div>
-          <p className="text-xs text-slate-400 mb-4">
+          <p className="text-xs text-ink-faint mb-4">
             Leave end date empty if your period is still ongoing.
           </p>
           <div className="flex gap-2">
             <button onClick={() => setShowForm(false)}
-              className="flex-1 h-12 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold">
+              className="flex-1 h-12 rounded-xl border border-line text-ink-soft text-sm font-semibold">
               Cancel
             </button>
             <button onClick={handleSave} disabled={saving || !startDate}
-              className="flex-1 h-12 rounded-xl bg-blue-600 text-white text-sm font-semibold disabled:opacity-50">
+              className="flex-1 h-12 rounded-xl bg-primary text-white text-sm font-semibold disabled:opacity-50">
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
@@ -576,8 +578,8 @@ function PeriodsTab() {
       {!loading && periods.length === 0 && !showForm && (
         <div className="text-center py-16">
           <p className="text-4xl mb-3">🌸</p>
-          <p className="font-medium text-slate-700">No periods logged yet</p>
-          <p className="text-sm text-slate-400 mt-1">Tap above to log your first period.</p>
+          <p className="font-medium text-ink">No periods logged yet</p>
+          <p className="text-sm text-ink-faint mt-1">Tap above to log your first period.</p>
         </div>
       )}
 
@@ -586,19 +588,19 @@ function PeriodsTab() {
         const end = p.end_date ? new Date(p.end_date + 'T00:00:00') : null
         const duration = end ? daysBetween(p.start_date, p.end_date!) + 1 : null
         return (
-          <div key={p.id} className="bg-white rounded-2xl border border-slate-100
+          <div key={p.id} className="bg-surface rounded-2xl border border-line
             shadow-sm px-5 py-4 flex items-center justify-between">
             <div>
-              <p className="font-semibold text-slate-900 text-[15px]">
+              <p className="font-semibold text-ink text-[15px]">
                 {start.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-ink-faint mt-0.5">
                 {end
                   ? `Ended ${end.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} · ${duration} days`
                   : 'Ongoing'}
               </p>
             </div>
-            <button onClick={() => handleDelete(p.id)} className="text-xs text-red-400 font-medium">
+            <button onClick={() => handleDelete(p.id)} className="text-xs text-flare font-medium">
               Delete
             </button>
           </div>
@@ -667,8 +669,8 @@ function PhotosTab() {
           <button key={w} onClick={() => setSelectedWeek(w)}
             className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold
               transition-all ${selectedWeek === w
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'bg-white border border-slate-200 text-slate-600'}`}>
+                ? 'bg-primary text-white shadow-sm'
+                : 'bg-surface border border-line text-ink-soft'}`}>
             {w === currentWeek ? 'This week' : weekLabel(w)}
           </button>
         ))}
@@ -676,7 +678,7 @@ function PhotosTab() {
 
       {loading ? (
         <div className="flex justify-center py-12">
-          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
@@ -685,7 +687,7 @@ function PhotosTab() {
             const isUploading = uploading === key
 
             return (
-              <div key={key} className="bg-white rounded-2xl border border-slate-100
+              <div key={key} className="bg-surface rounded-2xl border border-line
                 shadow-sm overflow-hidden">
                 {existing ? (
                   <div className="relative">
@@ -696,9 +698,9 @@ function PhotosTab() {
                       <p className="text-white text-xs font-semibold">{emoji} {label}</p>
                     </div>
                     <button onClick={() => fileRefs.current[key]?.click()}
-                      className="absolute top-2 right-2 w-7 h-7 bg-white/90 rounded-full
+                      className="absolute top-2 right-2 w-7 h-7 bg-surface/90 rounded-full
                         flex items-center justify-center shadow">
-                      <svg className="w-3.5 h-3.5 text-slate-700" viewBox="0 0 14 14" fill="none">
+                      <svg className="w-3.5 h-3.5 text-ink" viewBox="0 0 14 14" fill="none">
                         <path d="M7 2v10M2 7h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                       </svg>
                     </button>
@@ -706,17 +708,17 @@ function PhotosTab() {
                 ) : (
                   <button onClick={() => fileRefs.current[key]?.click()} disabled={isUploading}
                     className="w-full aspect-square flex flex-col items-center justify-center
-                      gap-2 p-4 hover:bg-slate-50 transition-colors">
+                      gap-2 p-4 hover:bg-surface-alt transition-colors">
                     {isUploading ? (
-                      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent
+                      <div className="w-6 h-6 border-2 border-primary border-t-transparent
                         rounded-full animate-spin" />
                     ) : (
                       <>
                         <span className="text-3xl">{emoji}</span>
-                        <p className="text-sm font-semibold text-slate-700">{label}</p>
-                        <p className="text-[10px] text-slate-400 text-center">{hint}</p>
-                        <div className="mt-1 w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
-                          <svg className="w-4 h-4 text-blue-600" viewBox="0 0 16 16" fill="none">
+                        <p className="text-sm font-semibold text-ink">{label}</p>
+                        <p className="text-[10px] text-ink-faint text-center">{hint}</p>
+                        <div className="mt-1 w-8 h-8 rounded-full bg-primary-soft flex items-center justify-center">
+                          <svg className="w-4 h-4 text-primary" viewBox="0 0 16 16" fill="none">
                             <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                           </svg>
                         </div>
@@ -737,8 +739,8 @@ function PhotosTab() {
         </div>
       )}
 
-      <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3">
-        <p className="text-xs text-blue-700 font-medium">
+      <div className="bg-primary-soft border border-primary/20 rounded-2xl px-4 py-3">
+        <p className="text-xs text-primary font-medium">
           💡 Take tongue photos first thing in the morning, before eating or drinking.
           Same lighting and angle each week makes comparison far more meaningful.
         </p>
@@ -749,9 +751,9 @@ function PhotosTab() {
 
 function StatBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-slate-50 rounded-xl px-3 py-3 text-center">
-      <p className="text-lg font-bold text-slate-900">{value}</p>
-      <p className="text-[10px] text-slate-400 mt-0.5">{label}</p>
+    <div className="bg-surface-alt rounded-xl px-3 py-3 text-center">
+      <p className="text-lg font-bold text-ink">{value}</p>
+      <p className="text-[10px] text-ink-faint mt-0.5">{label}</p>
     </div>
   )
 }
@@ -759,10 +761,10 @@ function StatBox({ label, value }: { label: string; value: string }) {
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex gap-3">
-      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide w-20 flex-shrink-0 pt-0.5">
+      <span className="text-xs font-semibold text-ink-faint uppercase tracking-wide w-20 flex-shrink-0 pt-0.5">
         {label}
       </span>
-      <span className="text-sm text-slate-700">{value}</span>
+      <span className="text-sm text-ink">{value}</span>
     </div>
   )
 }

@@ -122,18 +122,18 @@ export default function SignalsPage() {
   const filtered = filter === 'all' ? allSignals : allSignals.filter((s) => s.status === filter)
 
   return (
-    <div className="min-h-screen bg-[#F7F8FC] pb-28">
+    <div className="min-h-screen bg-bg pb-28">
       <div className="px-5 pt-10 pb-5 flex items-end justify-between">
         <div>
-          <p className="text-xs font-semibold tracking-widest text-blue-600 uppercase mb-1">
+          <p className="text-xs font-semibold tracking-widest text-intelligence uppercase mb-1">
             Health Journey
           </p>
-          <h1 className="text-3xl font-bold text-slate-900">Signals</h1>
+          <h1 className="text-3xl font-bold text-ink">Signals</h1>
         </div>
         <button
           onClick={refresh}
           disabled={busy}
-          className="text-sm text-blue-600 font-medium disabled:opacity-50"
+          className="text-sm text-intelligence font-medium disabled:opacity-50"
         >
           Refresh
         </button>
@@ -141,27 +141,27 @@ export default function SignalsPage() {
 
       <div className="px-4">
         {total > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 mb-4">
+          <div className="bg-surface rounded-2xl border border-line shadow-sm p-4 mb-4">
             <div className="grid grid-cols-4 gap-2 text-center">
               <div>
-                <p className="text-xl font-bold text-slate-900">{total}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Found</p>
+                <p className="text-xl font-bold text-ink">{total}</p>
+                <p className="text-[10px] text-ink-faint mt-0.5">Found</p>
               </div>
               <div>
-                <p className="text-xl font-bold text-emerald-600">{resolvedCount}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Confirmed</p>
+                <p className="text-xl font-bold text-intelligence">{resolvedCount}</p>
+                <p className="text-[10px] text-ink-faint mt-0.5">Confirmed</p>
               </div>
               <div>
-                <p className="text-xl font-bold text-slate-400">{dismissedCount}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Dismissed</p>
+                <p className="text-xl font-bold text-ink-faint">{dismissedCount}</p>
+                <p className="text-[10px] text-ink-faint mt-0.5">Dismissed</p>
               </div>
               <div>
-                <p className="text-xl font-bold text-blue-600">{activeCount}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Investigating</p>
+                <p className="text-xl font-bold text-intelligence">{activeCount}</p>
+                <p className="text-[10px] text-ink-faint mt-0.5">Investigating</p>
               </div>
             </div>
             {reviewedCount > 0 && (
-              <p className="text-xs text-slate-500 text-center mt-3 pt-3 border-t border-slate-100">
+              <p className="text-xs text-ink-soft text-center mt-3 pt-3 border-t border-line">
                 You&apos;ve confirmed {resolvedCount} of {reviewedCount} reviewed patterns ({Math.round((resolvedCount / reviewedCount) * 100)}%)
               </p>
             )}
@@ -175,7 +175,7 @@ export default function SignalsPage() {
                 key={f.key}
                 onClick={() => setFilter(f.key)}
                 className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all
-                  ${filter === f.key ? 'bg-blue-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-600'}`}
+                  ${filter === f.key ? 'bg-intelligence text-white shadow-sm' : 'bg-surface border border-line text-ink-soft'}`}
               >
                 {f.label}
               </button>
@@ -184,27 +184,27 @@ export default function SignalsPage() {
         )}
 
         {busy && total === 0 && (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 text-center">
-            <p className="text-sm text-slate-500">Looking for patterns across your data…</p>
+          <div className="bg-surface rounded-2xl border border-line shadow-sm p-6 text-center">
+            <p className="text-sm text-ink-soft">Looking for patterns across your data…</p>
           </div>
         )}
 
         {status === 'error' && total === 0 && (
-          <div className="bg-white rounded-2xl border border-red-100 shadow-sm p-6 text-center">
-            <p className="text-sm text-red-500 mb-3">Couldn&apos;t load your patterns.</p>
-            <button onClick={load} className="text-sm text-blue-600 font-medium">Try again</button>
+          <div className="bg-surface rounded-2xl border border-flare/20 shadow-sm p-6 text-center">
+            <p className="text-sm text-flare mb-3">Couldn&apos;t load your patterns.</p>
+            <button onClick={load} className="text-sm text-intelligence font-medium">Try again</button>
           </div>
         )}
 
         {!busy && status !== 'error' && total === 0 && (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 text-center">
-            <p className="text-sm text-slate-500">Nothing stands out yet. Keep logging — patterns usually take a few weeks to emerge.</p>
+          <div className="bg-surface rounded-2xl border border-line shadow-sm p-6 text-center">
+            <p className="text-sm text-ink-soft">Nothing stands out yet. Keep logging — patterns usually take a few weeks to emerge.</p>
           </div>
         )}
 
         {total > 0 && filtered.length === 0 && (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 text-center">
-            <p className="text-sm text-slate-500">Nothing in this filter yet.</p>
+          <div className="bg-surface rounded-2xl border border-line shadow-sm p-6 text-center">
+            <p className="text-sm text-ink-soft">Nothing in this filter yet.</p>
           </div>
         )}
 
@@ -229,10 +229,10 @@ export default function SignalsPage() {
         </div>
 
         {busy && total > 0 && (
-          <p className="text-xs text-slate-400 text-center mt-3">Checking for updates…</p>
+          <p className="text-xs text-ink-faint text-center mt-3">Checking for updates…</p>
         )}
 
-        <p className="text-xs text-slate-400 text-center mt-6 leading-4">
+        <p className="text-xs text-ink-faint text-center mt-6 leading-4">
           Signals are AI-generated hypotheses based on your own logged data. They are not medical advice — always discuss anything concerning with a doctor.
         </p>
       </div>

@@ -17,8 +17,8 @@ export default function Chip({ label, selected, onToggle, size = 'md' }: ChipPro
         rounded-full font-medium transition-all duration-150 select-none
         ${size === 'sm' ? 'px-3 py-1.5 text-xs' : 'px-4 py-2 text-sm'}
         ${selected
-          ? 'bg-blue-600 text-white shadow-sm shadow-blue-200'
-          : 'bg-white text-slate-700 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
+          ? 'bg-primary text-white shadow-sm shadow-primary/25'
+          : 'bg-surface text-ink border border-line hover:border-primary/50 hover:text-primary'
         }
       `}
     >

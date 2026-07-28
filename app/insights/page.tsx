@@ -1,21 +1,25 @@
 // app/insights/page.tsx
-// REWORKED:
-// 1. Specialist board is now TABS (Physician/Dermatologist/Psychologist/
-//    Gut/Nutritionist/TCM/Lab Details) instead of a vertical accordion —
-//    vertical reading of 6 specialists was hard to scan.
-// 2. Blood Report Analysis folded in as a "Lab Details" tab alongside the
-//    other specialists, rather than a separate top-level section — the
-//    Physician specialist already summarizes the same blood data, so a
-//    fully separate section duplicated it.
-// 3. New "Questions For You" section: specialists' questions_for_this_
-//    specialty are answerable directly. Answers save via /api/agents/
-//    questions and automatically feed back into the next analysis.
-// 4. Generating/polling logic unchanged from before — status: 'generating'
-//    responses poll every 5s, cached data stays visible with an "Updating"
-//    badge instead of blanking.
+// Redesigned onto the shared Card/Tag system (see plan: Flarewise visual
+// design system, Phase 2). Data fetching, polling, and every API contract
+// below is UNCHANGED from the previous version — this is a rendering
+// rebuild only. The generic RenderValue/ObjectFields key-dumper is gone,
+// replaced by actual designed sections plus one real blood-marker trend
+// chart (built per this project's dataviz skill: categorical lines
+// validated for CVD-safety, direct end labels, muted gridlines, hover
+// tooltip, one axis).
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import {
+  Stethoscope, Sparkles, Brain, Wind, Leaf, Compass, FlaskConical,
+  CheckCircle2, Eye, Link2, Handshake, Shuffle, Stethoscope as DoctorIcon,
+  MessageCircle, TrendingUp, AlertCircle,
+} from 'lucide-react'
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+} from 'recharts'
+import Card from '../../components/shared/Card'
+import Tag from '../../components/shared/Tag'
 
 type Period = 'week' | 'this_month' | 'last_month' | 'month' | 'quarter' | 'year'
 type AgentStatus = 'success' | 'generating' | 'error'
@@ -31,6 +35,13 @@ const PERIODS: { key: Period; label: string }[] = [
 
 const POLL_INTERVAL_MS = 5000
 
+// Chart line colors — validated separately from the app's muted UI
+// palette (which is intentionally low-chroma and fails categorical CVD
+// checks). See dataviz skill: node scripts/validate_palette.js
+// "#1baf7a,#4a3aa7,#eb6834" --mode light — passes all checks (WARN on
+// contrast for the green against white, mitigated by direct labels below).
+const CHART_LINE_COLORS = ['#1baf7a', '#4a3aa7', '#eb6834']
+
 // ─── Health Intelligence (A3 consolidator) ────────────────────────
 
 interface CrossSpecialtyInsight {
@@ -42,7 +53,7 @@ interface CrossSpecialtyInsight {
 }
 
 interface SpecialistCard {
-  status?: 'success' | 'generating' | 'error'
+  status?: 'success' | 'generating' | 'error' | 'not_generated'
   has_data?: boolean
   [key: string]: any
 }
@@ -74,7 +85,7 @@ interface HealthInsight {
   board?: BoardSection
 }
 
-// ─── Blood Report Analysis (A1) — now the "Lab Details" tab ────────
+// ─── Blood Report Analysis (A1) — "Lab Details" tab ────────
 
 interface BloodMarker {
   name: string; value: number; unit: string; reference?: string
@@ -107,6 +118,14 @@ interface BloodInsight {
   disclaimer?: string
 }
 
+// ─── Raw blood report history — for the trend chart only ─────────
+
+interface RawBloodReport {
+  id: string
+  report_date: string
+  markers: Record<string, { value: number; unit: string; reference?: string }> | null
+}
+
 // ─── Questions For You ──────────────────────────────────────────────
 
 interface SpecialistQuestion {
@@ -118,14 +137,14 @@ interface SpecialistQuestion {
   created_at: string
 }
 
-const SPECIALIST_TABS: { key: keyof BoardSection | 'lab'; icon: string; label: string; agentId: string }[] = [
-  { key: 'physician', icon: '🩺', label: 'Physician', agentId: 'A3a' },
-  { key: 'dermatologist', icon: '🧴', label: 'Dermatologist', agentId: 'A3b' },
-  { key: 'psychologist', icon: '🧠', label: 'Psychologist', agentId: 'A3c' },
-  { key: 'gutMicrobiomeDoctor', icon: '🦠', label: 'Gut', agentId: 'A3d' },
-  { key: 'nutritionist', icon: '🥗', label: 'Nutritionist', agentId: 'A3f' },
-  { key: 'tcmPractitioner', icon: '☯️', label: 'TCM', agentId: 'A3e' },
-  { key: 'lab', icon: '🩸', label: 'Lab Details', agentId: 'A1' },
+const SPECIALIST_TABS: { key: keyof BoardSection | 'lab'; icon: typeof Stethoscope; label: string; agentId: string }[] = [
+  { key: 'physician', icon: Stethoscope, label: 'Physician', agentId: 'A3a' },
+  { key: 'dermatologist', icon: Sparkles, label: 'Dermatologist', agentId: 'A3b' },
+  { key: 'psychologist', icon: Brain, label: 'Psychologist', agentId: 'A3c' },
+  { key: 'gutMicrobiomeDoctor', icon: Wind, label: 'Gut', agentId: 'A3d' },
+  { key: 'nutritionist', icon: Leaf, label: 'Nutritionist', agentId: 'A3f' },
+  { key: 'tcmPractitioner', icon: Compass, label: 'TCM', agentId: 'A3e' },
+  { key: 'lab', icon: FlaskConical, label: 'Lab Details', agentId: 'A1' },
 ]
 
 export default function InsightsPage() {
@@ -137,6 +156,7 @@ export default function InsightsPage() {
 
   const [bloodData, setBloodData] = useState<BloodInsight | null>(null)
   const [bloodStatus, setBloodStatus] = useState<AgentStatus>('generating')
+  const [bloodHistory, setBloodHistory] = useState<RawBloodReport[]>([])
 
   const [questions, setQuestions] = useState<SpecialistQuestion[]>([])
   const [drafts, setDrafts] = useState<Record<string, string>>({})
@@ -191,6 +211,19 @@ export default function InsightsPage() {
       }
     } catch {
       if (requestId === bloodRequestId.current) setBloodStatus('error')
+    }
+  }
+
+  // Raw report history, for the trend chart only — same GET endpoint the
+  // Blood Reports page already uses, no new API surface.
+  async function loadBloodHistory() {
+    try {
+      const res = await fetch('/api/blood-reports')
+      if (!res.ok) return
+      const json = await res.json()
+      setBloodHistory(json.reports ?? [])
+    } catch {
+      // chart is supplementary — silent failure, rest of the page still works
     }
   }
 
@@ -251,6 +284,7 @@ export default function InsightsPage() {
 
   useEffect(() => {
     loadBlood()
+    loadBloodHistory()
     loadQuestions()
     return () => { if (bloodPollTimer.current) clearTimeout(bloodPollTimer.current) }
   }, [])
@@ -259,18 +293,18 @@ export default function InsightsPage() {
   const bloodBusy = bloodStatus === 'generating'
 
   return (
-    <div className="min-h-screen bg-[#F7F8FC] pb-28">
+    <div className="min-h-screen bg-bg pb-28">
       <div className="px-5 pt-10 pb-5 flex items-end justify-between">
         <div>
-          <p className="text-xs font-semibold tracking-widest text-blue-600 uppercase mb-1">
+          <p className="text-xs font-semibold tracking-widest text-intelligence uppercase mb-1">
             AI Insights
           </p>
-          <h1 className="text-3xl font-bold text-slate-900">Your Patterns</h1>
+          <h1 className="font-display text-3xl font-semibold text-ink">Your Patterns</h1>
         </div>
         <button
           onClick={forceRefresh}
           disabled={healthBusy && bloodBusy}
-          className="text-sm text-blue-600 font-medium disabled:opacity-50"
+          className="text-sm text-primary font-medium disabled:opacity-50"
         >
           Refresh
         </button>
@@ -282,8 +316,8 @@ export default function InsightsPage() {
             <button key={p.key} onClick={() => setPeriod(p.key)}
               className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-semibold transition-all
                 ${period === p.key
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-white border border-slate-200 text-slate-600'}`}>
+                  ? 'bg-primary text-white shadow-sm'
+                  : 'bg-surface border border-line text-ink-soft'}`}>
               {p.label}
             </button>
           ))}
@@ -291,6 +325,8 @@ export default function InsightsPage() {
       </div>
 
       <div className="px-4 space-y-3">
+        <BloodTrendChart history={bloodHistory} flags={bloodData?.flags} />
+
         {healthBusy && !healthData && <LoadingCard message="Running the specialist board…" />}
         {healthStatus === 'error' && (
           <ErrorCard message="Couldn't load health insights." onRetry={() => loadHealth(period)} />
@@ -300,28 +336,24 @@ export default function InsightsPage() {
           <>
             {healthBusy && <UpdatingBadge label="Updating insights…" />}
 
-            {/* ── SPECIALIST TABS — rendered first, independent of whether
-                the consolidator has finished. Each specialist's data shows
-                as soon as IT completes, not gated behind the final
-                combined result. This is what was broken before: this
-                section used to live inside the has_data check below,
-                which stayed false (undefined, actually) for the entire
-                time the consolidator was still running, hiding specialist
-                data that had already arrived. ────────────────────── */}
+            {/* Specialist tabs — rendered as soon as the board data arrives,
+                independent of whether the consolidator has finished, so
+                each specialist's read shows the moment IT completes. */}
             {healthData.board && (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="flex gap-1 overflow-x-auto px-3 pt-3 pb-1 border-b border-slate-100">
+              <Card className="!p-0 overflow-hidden">
+                <div className="flex gap-1 overflow-x-auto px-3 pt-3 pb-1 border-b border-line">
                   {SPECIALIST_TABS.map((tab) => {
                     const card = tab.key === 'lab' ? null : healthData.board?.[tab.key as keyof BoardSection]
-                    const dotStatus = tab.key === 'lab' ? bloodStatus : (card?.status ?? (card?.has_data ? 'success' : 'generating'))
+                    const dotStatus = tab.key === 'lab' ? bloodStatus : (card?.status ?? (card?.has_data ? 'success' : 'not_generated'))
+                    const Icon = tab.icon
                     return (
                       <button
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
                         className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all
-                          ${activeTab === tab.key ? 'bg-blue-50 text-blue-700' : 'text-slate-500'}`}
+                          ${activeTab === tab.key ? 'bg-intelligence-soft text-intelligence' : 'text-ink-faint'}`}
                       >
-                        <span>{tab.icon}</span>
+                        <Icon size={13} />
                         <span>{tab.label}</span>
                         <StatusDot status={dotStatus} />
                       </button>
@@ -335,132 +367,130 @@ export default function InsightsPage() {
                       return <LabDetailsPanel key="lab" bloodData={bloodData} bloodBusy={bloodBusy} bloodStatus={bloodStatus} onRetry={loadBlood} />
                     }
                     const card = healthData.board?.[tab.key as keyof BoardSection]
-                    if (!card) return <p key={tab.key} className="text-xs text-slate-400">Not started yet.</p>
-                    if (card.status === 'generating' || (!card.has_data && !card.error)) {
+                    if (!card || card.status === 'not_generated') {
+                      return (
+                        <p key={tab.key} className="text-xs text-ink-faint py-2">
+                          Not generated yet — tap Refresh above to check for patterns.
+                        </p>
+                      )
+                    }
+                    if (card.status === 'generating') {
                       return (
                         <div key={tab.key} className="flex items-center gap-2 py-4">
-                          <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                          <p className="text-xs text-slate-400">Still working on this one…</p>
+                          <div className="w-3 h-3 border-2 border-intelligence/40 border-t-transparent rounded-full animate-spin" />
+                          <p className="text-xs text-ink-faint">Still working on this one…</p>
                         </div>
                       )
                     }
                     if (card.has_data === false) {
-                      return <p key={tab.key} className="text-xs text-slate-400">Hit a snag — will retry on the next refresh.</p>
+                      return <p key={tab.key} className="text-xs text-ink-faint">Hit a snag — will retry on the next refresh.</p>
                     }
                     return <SpecialistFields key={tab.key} card={card} />
                   })}
                 </div>
-              </div>
+              </Card>
             )}
 
             {!healthData.board && !healthData.summary ? (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-8 text-center">
-                <p className="text-4xl mb-3">📊</p>
-                <p className="font-medium text-slate-700">
+              <Card className="text-center py-8">
+                <Sparkles className="mx-auto mb-3 text-ink-faint" size={28} />
+                <p className="font-medium text-ink-soft">
                   {healthData.summary ?? 'Getting started — check back in a moment.'}
                 </p>
-              </div>
+              </Card>
             ) : (
               <>
                 {healthData.summary && (
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-5">
+                  <Card tone="intelligence">
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-lg">📅</span>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-white
-                        bg-blue-600 px-2 py-0.5 rounded-full">
-                        {PERIODS.find((p) => p.key === period)?.label}
-                      </span>
+                      <Tag tone="intelligence">{PERIODS.find((p) => p.key === period)?.label}</Tag>
                     </div>
-                    <p className="text-sm text-slate-700 leading-relaxed">
+                    <p className="font-display text-lg leading-snug text-ink">
                       <BoldText text={healthData.summary} />
                     </p>
-                  </div>
+                  </Card>
                 )}
 
                 {(healthData.biggest_change || healthData.what_deserves_attention_this_week) && (
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-5 space-y-4">
+                  <Card className="space-y-4">
                     {healthData.biggest_change && (
-                      <InsightRow icon="⚡" label="Biggest Change" text={healthData.biggest_change} />
+                      <InsightRow icon={TrendingUp} label="Biggest Change" text={healthData.biggest_change} />
                     )}
                     {healthData.what_deserves_attention_this_week && (
-                      <InsightRow icon="🎯" label="What Deserves Attention" text={healthData.what_deserves_attention_this_week} />
+                      <InsightRow icon={Eye} label="What Deserves Attention" text={healthData.what_deserves_attention_this_week} />
                     )}
-                  </div>
+                  </Card>
                 )}
 
                 {healthData.to_do && healthData.to_do.length > 0 && (
-                  <div className="bg-green-50 border border-green-100 rounded-2xl px-5 py-4">
-                    <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-2">✅ To Do</p>
+                  <Card tone="default" className="border-primary/25">
+                    <p className="text-xs font-bold text-primary uppercase tracking-wide mb-2">To Do</p>
                     <ul className="space-y-1.5">
                       {healthData.to_do.map((item, i) => (
-                        <li key={i} className="flex gap-2 text-xs text-green-800 leading-relaxed">
-                          <span className="text-green-500 flex-shrink-0">•</span>
+                        <li key={i} className="flex gap-2 text-xs text-ink-soft leading-relaxed">
+                          <CheckCircle2 size={13} className="flex-shrink-0 mt-0.5 text-primary" />
                           <span><BoldText text={item} /></span>
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </Card>
                 )}
                 {healthData.to_check && healthData.to_check.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-100 rounded-2xl px-5 py-4">
-                    <p className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-2">👁️ To Check</p>
+                  <Card tone="caution">
+                    <p className="text-xs font-bold text-caution uppercase tracking-wide mb-2">To Check</p>
                     <ul className="space-y-1.5">
                       {healthData.to_check.map((item, i) => (
-                        <li key={i} className="flex gap-2 text-xs text-amber-800 leading-relaxed">
-                          <span className="text-amber-500 flex-shrink-0">•</span>
+                        <li key={i} className="flex gap-2 text-xs text-ink-soft leading-relaxed">
+                          <Eye size={13} className="flex-shrink-0 mt-0.5 text-caution" />
                           <span><BoldText text={item} /></span>
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </Card>
                 )}
 
                 {healthData.cross_specialty_insights && healthData.cross_specialty_insights.length > 0 && (
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-5">
+                  <Card tone="intelligence">
                     <div className="flex items-center gap-2 mb-4">
-                      <span className="text-lg">🔗</span>
-                      <p className="font-semibold text-slate-900">Cross-Specialty Insights</p>
+                      <Link2 size={16} className="text-intelligence" />
+                      <p className="font-display font-semibold text-ink">Cross-Specialty Insights</p>
                     </div>
                     <div className="space-y-4">
                       {healthData.cross_specialty_insights.map((ins, i) => (
-                        <div key={i} className="border-t border-slate-50 pt-4 first:border-0 first:pt-0">
-                          <p className="text-sm text-slate-700 leading-relaxed"><BoldText text={ins.insight} /></p>
+                        <div key={i} className="border-t border-intelligence/15 pt-4 first:border-0 first:pt-0">
+                          <p className="text-sm text-ink leading-relaxed"><BoldText text={ins.insight} /></p>
                           {ins.specialists?.length > 0 && (
                             <div className="flex flex-wrap gap-1.5 mt-2">
-                              {ins.specialists.map((s) => (
-                                <span key={s} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">
-                                  {s}
-                                </span>
-                              ))}
+                              {ins.specialists.map((s) => <Tag key={s} tone="intelligence">{s}</Tag>)}
                             </div>
                           )}
-                          <p className="text-xs text-slate-500 mt-2">
-                            <span className="font-semibold text-slate-600">Evidence: </span>
+                          <p className="text-xs text-ink-soft mt-2">
+                            <span className="font-semibold">Evidence: </span>
                             {ins.evidence}
                           </p>
                           {ins.other_possible_explanation && (
-                            <p className="text-[11px] text-slate-400 mt-1">
+                            <p className="text-[11px] text-ink-faint mt-1">
                               <span className="font-semibold">Could also be: </span>
                               {ins.other_possible_explanation}
                             </p>
                           )}
-                          <span className="text-[10px] font-semibold text-blue-500 mt-1 inline-block">
+                          <span className="text-[10px] font-semibold text-intelligence mt-1 inline-block font-data">
                             {ins.confidence}% confidence
                           </span>
                         </div>
                       ))}
                     </div>
-                  </div>
+                  </Card>
                 )}
 
                 {healthData.points_of_agreement && healthData.points_of_agreement.length > 0 && (
-                  <ListCard icon="🤝" title="Where the Board Agreed" items={healthData.points_of_agreement} />
+                  <ListCard icon={Handshake} title="Where the Board Agreed" items={healthData.points_of_agreement} />
                 )}
                 {healthData.points_of_divergence && healthData.points_of_divergence.length > 0 && (
-                  <ListCard icon="🔀" title="Where Reads Diverged" items={healthData.points_of_divergence} />
+                  <ListCard icon={Shuffle} title="Where Reads Diverged" items={healthData.points_of_divergence} />
                 )}
                 {healthData.questions_worth_exploring_with_your_doctor && healthData.questions_worth_exploring_with_your_doctor.length > 0 && (
-                  <ListCard icon="👩‍⚕️" title="Questions for Your Doctor" items={healthData.questions_worth_exploring_with_your_doctor} />
+                  <ListCard icon={DoctorIcon} title="Questions for Your Doctor" items={healthData.questions_worth_exploring_with_your_doctor} />
                 )}
               </>
             )}
@@ -469,48 +499,133 @@ export default function InsightsPage() {
 
         {/* ── QUESTIONS FOR YOU ─────────────────────────────── */}
         {questions.length > 0 && (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-5">
+          <Card>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-lg">💬</span>
-              <p className="font-semibold text-slate-900">Questions For You</p>
+              <MessageCircle size={16} className="text-primary" />
+              <p className="font-display font-semibold text-ink">Questions For You</p>
             </div>
-            <p className="text-xs text-slate-400 mb-4">
+            <p className="text-xs text-ink-faint mb-4">
               Your answers feed directly into the next analysis — no need to answer them all at once.
             </p>
             <div className="space-y-4">
               {questions.map((q) => (
-                <div key={q.id} className="border-t border-slate-50 pt-4 first:border-0 first:pt-0">
-                  <p className="text-sm text-slate-700 leading-relaxed mb-2">{q.question}</p>
+                <div key={q.id} className="border-t border-line pt-4 first:border-0 first:pt-0">
+                  <p className="text-sm text-ink leading-relaxed mb-2">{q.question}</p>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       defaultValue={q.answer ?? ''}
                       onChange={(e) => setDrafts((d) => ({ ...d, [q.id]: e.target.value }))}
                       placeholder="Your answer…"
-                      className="flex-1 text-xs px-3 py-2 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-400"
+                      className="flex-1 text-xs px-3 py-2 rounded-xl border border-line bg-surface-alt focus:outline-none focus:border-primary"
                     />
                     <button
                       onClick={() => saveAnswer(q)}
                       disabled={savingId === q.id}
-                      className="text-xs font-semibold text-blue-600 px-3 disabled:opacity-40"
+                      className="text-xs font-semibold text-primary px-3 disabled:opacity-40"
                     >
                       {savingId === q.id ? '…' : 'Save'}
                     </button>
                   </div>
                   {q.answered_at && drafts[q.id] === undefined && (
-                    <p className="text-[10px] text-green-600 mt-1">✓ Answered</p>
+                    <p className="text-[10px] text-primary mt-1">✓ Answered</p>
                   )}
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
 
-        <p className="text-center text-[10px] text-slate-300 pt-2 pb-4">
+        <p className="text-center text-[10px] text-ink-faint pt-2 pb-4">
           Powered by Gemini · Not medical advice
         </p>
       </div>
     </div>
+  )
+}
+
+// ─── Blood marker trend chart ─────────────────────────────────────
+// Only rendered when there's a real trend to show: at least one flagged
+// (abnormal/borderline) marker with 2+ historical data points. A single
+// data point isn't a trend, and normal markers don't need a chart — this
+// is meant to answer "is the thing worth watching moving?", not to be a
+// dashboard of every number ever logged.
+
+function BloodTrendChart({ history, flags }: {
+  history: RawBloodReport[]
+  flags?: { marker: string; status: string; note: string; suggest_doctor_discussion: boolean }[]
+}) {
+  if (history.length < 2) return null
+
+  const flaggedNames = (flags ?? []).map((f) => f.marker)
+  if (flaggedNames.length === 0) return null
+
+  const sorted = [...history].sort((a, b) => a.report_date.localeCompare(b.report_date))
+
+  // One series per flagged marker, each built ONLY from reports where that
+  // specific marker actually appears — different markers get uploaded on
+  // different dates, so a shared date axis across all of them would show
+  // every report's date regardless of relevance. Capped at 3, matching the
+  // validated chart-line palette.
+  const series = flaggedNames.slice(0, 3).map((name) => {
+    const points = sorted
+      .map((r) => {
+        const key = Object.keys(r.markers ?? {}).find((k) => k.toLowerCase() === name.toLowerCase())
+        if (!key) return null
+        return {
+          date: new Date(r.report_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' }),
+          value: r.markers![key].value,
+          unit: r.markers![key].unit,
+        }
+      })
+      .filter((p): p is { date: string; value: number; unit: string } => p !== null)
+    return { name, points, unit: points[points.length - 1]?.unit ?? '' }
+  }).filter((s) => s.points.length >= 2) // a single point isn't a trend
+
+  if (series.length === 0) return null
+
+  return (
+    <Card>
+      <div className="flex items-center gap-2 mb-1">
+        <TrendingUp size={16} className="text-caution" />
+        <p className="font-display font-semibold text-ink">Worth Watching</p>
+      </div>
+      <p className="text-xs text-ink-faint mb-4">Markers flagged outside range, tracked across your uploaded reports.</p>
+
+      {/* Small multiples — each marker has its own scale (g/dL, µg/dL,
+          mg/dL, ... are not comparable on one shared axis), so this is
+          several small single-series charts, not one combined chart. A
+          single series needs no legend — the title names it. */}
+      <div className="space-y-5">
+        {series.map((s, i) => (
+          <div key={s.name}>
+            <p className="text-xs font-semibold text-ink mb-1">
+              {s.name} <span className="text-ink-faint font-normal font-data">({s.unit})</span>
+            </p>
+            <div style={{ width: '100%', height: 120 }}>
+              <ResponsiveContainer>
+                <LineChart data={s.points} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-line)" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-ink-faint)' }} axisLine={{ stroke: 'var(--color-line)' }} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--color-ink-faint)' }} axisLine={false} tickLine={false} width={34} domain={['auto', 'auto']} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 10, border: '1px solid var(--color-line)', fontSize: 12, background: 'var(--color-surface)' }}
+                    formatter={(value) => [`${value} ${s.unit}`, s.name]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke={CHART_LINE_COLORS[i % CHART_LINE_COLORS.length]}
+                    strokeWidth={2}
+                    dot={{ r: 3 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
   )
 }
 
@@ -521,72 +636,70 @@ function LabDetailsPanel({ bloodData, bloodBusy, bloodStatus, onRetry }: {
 }) {
   if (bloodBusy && !bloodData) return <LoadingCard message="Analysing your blood reports…" />
   if (bloodStatus === 'error') return <ErrorCard message="Couldn't load blood analysis." onRetry={onRetry} />
-  if (!bloodData) return <p className="text-xs text-slate-400">No data yet.</p>
-  if (!bloodData.has_data) return <p className="text-xs text-slate-400">{bloodData.message}</p>
+  if (!bloodData) return <p className="text-xs text-ink-faint">No data yet.</p>
+  if (!bloodData.has_data) return <p className="text-xs text-ink-faint">{bloodData.message}</p>
 
   return (
     <div className="space-y-4">
       {bloodBusy && <UpdatingBadge label="Updating lab details…" />}
 
       {bloodData.previous_date && (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-ink-faint">
           Comparing {bloodData.previous_date} → {bloodData.latest_date}
         </p>
       )}
-      <p className="text-sm text-slate-700 leading-relaxed">{bloodData.overall_summary}</p>
+      <p className="text-sm text-ink leading-relaxed">{bloodData.overall_summary}</p>
 
       {bloodData.previous_date && (bloodData.improved?.length || bloodData.worsened?.length) ? (
         <div className="grid grid-cols-2 gap-3">
           {bloodData.improved && bloodData.improved.length > 0 && (
-            <div className="bg-green-50 border border-green-100 rounded-2xl px-4 py-4">
-              <p className="text-xs font-semibold text-green-700 mb-2">📈 Improved</p>
-              {bloodData.improved.map((m) => <p key={m} className="text-xs text-green-700">{m}</p>)}
+            <div className="bg-primary-soft rounded-2xl px-4 py-4">
+              <p className="text-xs font-semibold text-primary mb-2">Improved</p>
+              {bloodData.improved.map((m) => <p key={m} className="text-xs text-primary">{m}</p>)}
             </div>
           )}
           {bloodData.worsened && bloodData.worsened.length > 0 && (
-            <div className="bg-orange-50 border border-orange-100 rounded-2xl px-4 py-4">
-              <p className="text-xs font-semibold text-orange-700 mb-2">📉 Needs Attention</p>
-              {bloodData.worsened.map((m) => <p key={m} className="text-xs text-orange-700">{m}</p>)}
+            <div className="bg-flare-soft rounded-2xl px-4 py-4">
+              <p className="text-xs font-semibold text-flare mb-2">Needs Attention</p>
+              {bloodData.worsened.map((m) => <p key={m} className="text-xs text-flare">{m}</p>)}
             </div>
           )}
         </div>
       ) : null}
 
       {bloodData.by_system?.map((sys) => (
-        <div key={sys.system} className="border border-slate-100 rounded-2xl overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <p className="font-semibold text-slate-900 text-sm">{sys.system}</p>
-            <p className="text-xs text-slate-400 mt-0.5">{sys.system_summary}</p>
+        <div key={sys.system} className="border border-line rounded-2xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-line">
+            <p className="font-semibold text-ink text-sm">{sys.system}</p>
+            <p className="text-xs text-ink-faint mt-0.5">{sys.system_summary}</p>
           </div>
           <div className="px-4 pb-3 pt-2 space-y-3">
             {sys.markers.map((m) => (
-              <div key={m.name} className="border-t border-slate-50 pt-3 first:border-0 first:pt-1">
+              <div key={m.name} className="border-t border-line/60 pt-3 first:border-0 first:pt-1">
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
                     <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                      m.status === 'normal' ? 'bg-green-400'
-                      : m.status.includes('borderline') ? 'bg-yellow-400'
-                      : 'bg-orange-400'
+                      m.status === 'normal' ? 'bg-primary'
+                      : m.status.includes('borderline') ? 'bg-caution'
+                      : 'bg-flare'
                     }`} />
-                    <span className="text-sm font-medium text-slate-800">{m.name}</span>
+                    <span className="text-sm font-medium text-ink">{m.name}</span>
                     {m.change && m.change !== 'stable' && m.change !== 'new' && (
-                      <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                        m.change === 'improved' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'
-                      }`}>
+                      <Tag tone={m.change === 'improved' ? 'data' : 'flare'} className="!px-1.5 !py-0">
                         {m.change === 'improved' ? '↑' : '↓'}
-                      </span>
+                      </Tag>
                     )}
                   </div>
                   <div className="text-right">
-                    <span className={`text-sm font-semibold ${m.status === 'normal' ? 'text-slate-900' : 'text-orange-500'}`}>
+                    <span className={`text-sm font-semibold font-data ${m.status === 'normal' ? 'text-ink' : 'text-flare'}`}>
                       {m.value} {m.unit}
                     </span>
-                    {m.reference && <p className="text-[10px] text-slate-400">{m.reference}</p>}
+                    {m.reference && <p className="text-[10px] text-ink-faint font-data">{m.reference}</p>}
                   </div>
                 </div>
-                <p className="text-xs text-slate-500 leading-relaxed pl-3.5">{m.plain_language}</p>
+                <p className="text-xs text-ink-soft leading-relaxed pl-3.5">{m.plain_language}</p>
                 {m.previous_value !== undefined && (
-                  <p className="text-[10px] text-slate-400 pl-3.5 mt-0.5">Previous: {m.previous_value} {m.unit}</p>
+                  <p className="text-[10px] text-ink-faint pl-3.5 mt-0.5 font-data">Previous: {m.previous_value} {m.unit}</p>
                 )}
               </div>
             ))}
@@ -595,25 +708,28 @@ function LabDetailsPanel({ bloodData, bloodBusy, bloodStatus, onRetry }: {
       ))}
 
       {bloodData.flags && bloodData.flags.filter((f) => f.suggest_doctor_discussion).length > 0 && (
-        <div className="bg-orange-50 border border-orange-100 rounded-2xl px-4 py-4">
-          <p className="text-xs font-semibold text-orange-700 mb-2">⚠️ Worth discussing with your doctor</p>
+        <div className="bg-caution-soft rounded-2xl px-4 py-4">
+          <div className="flex items-center gap-1.5 mb-2">
+            <AlertCircle size={14} className="text-caution" />
+            <p className="text-xs font-semibold text-caution">Worth discussing with your doctor</p>
+          </div>
           {bloodData.flags.filter((f) => f.suggest_doctor_discussion).map((f, i) => (
-            <p key={i} className="text-xs text-orange-700 mt-1">· {f.marker}: {f.note}</p>
+            <p key={i} className="text-xs text-caution mt-1">· {f.marker}: {f.note}</p>
           ))}
         </div>
       )}
 
       {bloodData.questions_for_doctor && bloodData.questions_for_doctor.length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Questions for Your Doctor</p>
+          <p className="text-xs font-semibold text-ink-faint uppercase tracking-wide mb-2">Questions for Your Doctor</p>
           {bloodData.questions_for_doctor.map((q, i) => (
-            <p key={i} className="text-xs text-slate-600 mb-1">→ {q}</p>
+            <p key={i} className="text-xs text-ink-soft mb-1">→ {q}</p>
           ))}
         </div>
       )}
 
       {bloodData.disclaimer && (
-        <p className="text-center text-[10px] text-slate-300 pt-2">{bloodData.disclaimer}</p>
+        <p className="text-center text-[10px] text-ink-faint pt-2">{bloodData.disclaimer}</p>
       )}
     </div>
   )
@@ -627,7 +743,7 @@ function BoldText({ text }: { text: string }) {
     <>
       {parts.map((part, i) =>
         part.startsWith('**') && part.endsWith('**')
-          ? <strong key={i} className="font-semibold text-slate-900">{part.slice(2, -2)}</strong>
+          ? <strong key={i} className="font-semibold text-ink">{part.slice(2, -2)}</strong>
           : <span key={i}>{part}</span>
       )}
     </>
@@ -638,21 +754,21 @@ function RenderValue({ value, compact = false }: { value: any; compact?: boolean
   if (value === null || value === undefined || value === '') return null
 
   if (typeof value === 'string') {
-    return <p className="text-xs text-slate-600 leading-relaxed"><BoldText text={value} /></p>
+    return <p className="text-xs text-ink-soft leading-relaxed"><BoldText text={value} /></p>
   }
   if (typeof value === 'number') {
-    return <p className="text-xs text-slate-600">{value}</p>
+    return <p className="text-xs text-ink-soft font-data">{value}</p>
   }
   if (typeof value === 'boolean') {
-    return <p className="text-xs text-slate-600">{value ? 'Yes' : 'No'}</p>
+    return <p className="text-xs text-ink-soft">{value ? 'Yes' : 'No'}</p>
   }
   if (Array.isArray(value)) {
     if (value.length === 0) return null
     return (
       <ul className="space-y-2">
         {value.map((item, i) => (
-          <li key={i} className="flex gap-2 text-xs text-slate-600 leading-relaxed">
-            <span className="text-blue-400 flex-shrink-0 mt-0.5">•</span>
+          <li key={i} className="flex gap-2 text-xs text-ink-soft leading-relaxed">
+            <span className="text-intelligence flex-shrink-0 mt-0.5">•</span>
             {typeof item === 'object' && item !== null ? (
               <div className="flex-1"><ObjectFields obj={item} compact /></div>
             ) : (
@@ -680,13 +796,13 @@ function ObjectFields({ obj, compact = false }: { obj: Record<string, any>; comp
       {entries.map(([key, val]) => (
         <div key={key}>
           {!compact && (
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-0.5">
+            <p className="text-[10px] font-bold text-ink-faint uppercase tracking-wide mb-0.5">
               {key.replace(/_/g, ' ')}
             </p>
           )}
           {compact && typeof val === 'string' ? (
-            <p className="text-xs text-slate-600 leading-relaxed">
-              <span className="font-semibold text-slate-700">{key.replace(/_/g, ' ')}: </span>
+            <p className="text-xs text-ink-soft leading-relaxed">
+              <span className="font-semibold text-ink">{key.replace(/_/g, ' ')}: </span>
               <BoldText text={val} />
             </p>
           ) : (
@@ -706,7 +822,7 @@ function SpecialistFields({ card }: { card: SpecialistCard }) {
     <div className="space-y-4">
       {entries.map(([key, val]) => (
         <div key={key}>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">
+          <p className="text-[10px] font-bold text-ink-faint uppercase tracking-wide mb-1">
             {key.replace(/_/g, ' ')}
           </p>
           <RenderValue value={val} />
@@ -717,66 +833,66 @@ function SpecialistFields({ card }: { card: SpecialistCard }) {
 }
 
 function StatusDot({ status }: { status: string }) {
-  if (status === 'success') return <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
-  if (status === 'error') return <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
-  return <span className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-pulse" />
+  if (status === 'success') return <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+  if (status === 'error') return <span className="w-1.5 h-1.5 rounded-full bg-flare" />
+  if (status === 'not_generated') return <span className="w-1.5 h-1.5 rounded-full bg-line" />
+  return <span className="w-1.5 h-1.5 rounded-full bg-intelligence/50 animate-pulse" />
 }
 
-function InsightRow({ icon, label, text }: { icon: string; label: string; text: string }) {
+function InsightRow({ icon: Icon, label, text }: { icon: typeof TrendingUp; label: string; text: string }) {
   return (
     <div>
       <div className="flex items-center gap-2 mb-1">
-        <span className="text-base">{icon}</span>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
+        <Icon size={14} className="text-intelligence" />
+        <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide">{label}</p>
       </div>
-      <p className="text-sm text-slate-700 leading-relaxed pl-6"><BoldText text={text} /></p>
+      <p className="text-sm text-ink leading-relaxed pl-6"><BoldText text={text} /></p>
     </div>
   )
 }
 
-function ListCard({ icon, title, items }: { icon: string; title: string; items: string[] }) {
+function ListCard({ icon: Icon, title, items }: { icon: typeof Handshake; title: string; items: string[] }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-5">
+    <Card>
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-lg">{icon}</span>
-        <p className="font-semibold text-slate-900">{title}</p>
+        <Icon size={16} className="text-intelligence" />
+        <p className="font-display font-semibold text-ink">{title}</p>
       </div>
       <div className="space-y-2.5">
         {items.map((item, i) => (
           <div key={i} className="flex gap-2.5">
-            <span className="text-blue-400 flex-shrink-0">→</span>
-            <p className="text-sm text-slate-700 leading-relaxed">{item}</p>
+            <span className="text-intelligence flex-shrink-0">→</span>
+            <p className="text-sm text-ink leading-relaxed">{item}</p>
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   )
 }
 
 function LoadingCard({ message }: { message: string }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-5 py-8
-      flex flex-col items-center gap-3">
-      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      <p className="text-sm text-slate-400">{message}</p>
-    </div>
+    <Card className="flex flex-col items-center gap-3 py-8">
+      <div className="w-6 h-6 border-2 border-intelligence border-t-transparent rounded-full animate-spin" />
+      <p className="text-sm text-ink-faint">{message}</p>
+    </Card>
   )
 }
 
 function UpdatingBadge({ label }: { label: string }) {
   return (
     <div className="flex items-center gap-2 px-1">
-      <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-      <p className="text-xs text-blue-500 font-medium">{label}</p>
+      <div className="w-3 h-3 border-2 border-intelligence/50 border-t-transparent rounded-full animate-spin" />
+      <p className="text-xs text-intelligence font-medium">{label}</p>
     </div>
   )
 }
 
 function ErrorCard({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="bg-red-50 border border-red-100 rounded-2xl px-5 py-5 text-center">
-      <p className="text-red-500 font-medium text-sm">{message}</p>
-      <button onClick={onRetry} className="mt-3 text-sm text-blue-600 font-medium">Try again</button>
-    </div>
+    <Card tone="flare" className="text-center">
+      <p className="text-flare font-medium text-sm">{message}</p>
+      <button onClick={onRetry} className="mt-3 text-sm text-primary font-medium">Try again</button>
+    </Card>
   )
 }

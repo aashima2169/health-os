@@ -30,7 +30,7 @@ export default function MovementSection({ selected, onChange }: MovementSectionP
       completed={completed}
       microcopy="Every bit of movement counts."
     >
-      <p className="text-xs text-slate-400 mb-3">
+      <p className="text-xs text-ink-faint mb-3">
         Select everything you did — even a short walk counts
       </p>
       <div className="flex flex-wrap gap-2">
@@ -47,7 +47,7 @@ export default function MovementSection({ selected, onChange }: MovementSectionP
         <button
           type="button"
           onClick={() => onChange(['Rest day'])}
-          className="mt-3 text-xs text-slate-400 underline underline-offset-2"
+          className="mt-3 text-xs text-ink-faint underline underline-offset-2"
         >
           Rest day — that's okay too
         </button>

@@ -60,7 +60,7 @@ export default function DietSection({ diet, onChange }: DietSectionProps) {
       completed={completed}
       microcopy="You're building clarity every day."
     >
-      <p className="text-xs text-slate-400 mb-4">
+      <p className="text-xs text-ink-faint mb-4">
         Log yesterday's meals — tap a saved item to quick-add it, then type the quantity.
       </p>
       <div className="space-y-5">
@@ -68,7 +68,7 @@ export default function DietSection({ diet, onChange }: DietSectionProps) {
           <div key={key}>
             <div className="flex items-center gap-2 mb-2">
               <span className="text-base leading-6">{emoji}</span>
-              <span className="text-sm font-semibold text-slate-700 leading-6">{label}</span>
+              <span className="text-sm font-semibold text-ink leading-6">{label}</span>
             </div>
 
             {/* Home / Outside */}
@@ -83,8 +83,8 @@ export default function DietSection({ diet, onChange }: DietSectionProps) {
                   })}
                   className={`flex-1 h-9 rounded-xl text-xs font-semibold transition-all
                     ${diet[key].location === loc
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-slate-50 text-slate-600 border border-slate-200'}`}
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'bg-surface-alt text-ink-soft border border-line'}`}
                 >
                   {loc === 'home' ? '🏠 Home' : '🏪 Outside'}
                 </button>
@@ -114,8 +114,8 @@ export default function DietSection({ diet, onChange }: DietSectionProps) {
                     key={item}
                     type="button"
                     onClick={() => quickAdd(key, item)}
-                    className="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50
-                      text-blue-600 hover:bg-blue-100 transition-colors"
+                    className="px-2.5 py-1 rounded-full text-xs font-medium bg-primary-soft
+                      text-primary hover:bg-primary-soft transition-colors"
                   >
                     + {item}
                   </button>
@@ -128,12 +128,12 @@ export default function DietSection({ diet, onChange }: DietSectionProps) {
               value={diet[key].description}
               onChange={(e) => update(key, { description: e.target.value })}
               placeholder={placeholder} rows={2}
-              className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50
-                text-sm text-slate-900 placeholder:text-slate-300 resize-none
-                focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2.5 rounded-xl border border-line bg-surface-alt
+                text-sm text-ink placeholder:text-ink-faint resize-none
+                focus:outline-none focus:ring-2 focus:ring-primary"
             />
 
-            {key !== 'snacks' && <div className="w-full h-px bg-slate-100 mt-4" />}
+            {key !== 'snacks' && <div className="w-full h-px bg-surface-alt mt-4" />}
           </div>
         ))}
       </div>

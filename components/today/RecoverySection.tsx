@@ -30,7 +30,7 @@ export default function RecoverySection({ selected, onChange }: RecoverySectionP
       completed={completed}
       microcopy="Recovery is productive."
     >
-      <p className="text-xs text-slate-400 mb-3">
+      <p className="text-xs text-ink-faint mb-3">
         Select all recovery activities from today
       </p>
       <div className="flex flex-wrap gap-2">

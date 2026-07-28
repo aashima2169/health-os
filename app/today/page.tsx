@@ -184,29 +184,29 @@ function TodayPageInner() {
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening'
 
   if (loading) return (
-    <div className="min-h-screen bg-[#F7F8FC] flex items-center justify-center">
-      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen bg-bg flex items-center justify-center">
+      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-[#F7F8FC] pb-32">
+    <div className="min-h-screen bg-bg pb-32">
 
       {/* Header */}
       <div className="px-5 pt-10 pb-5">
-        <p className="text-xs font-semibold tracking-widest text-blue-600 uppercase mb-1">
+        <p className="text-xs font-semibold tracking-widest text-primary uppercase mb-1">
           {isToday ? 'Daily Check-in' : 'Editing a Past Day'}
         </p>
-        <h1 className="text-3xl font-bold text-slate-900">
+        <h1 className="text-3xl font-bold text-ink">
           {isToday ? `${greeting} 👋` : 'Editing'}
         </h1>
-        <p className="text-slate-400 text-sm mt-1">{formatDisplay(date)}</p>
+        <p className="text-ink-faint text-sm mt-1">{formatDisplay(date)}</p>
       </div>
 
       {/* Saved toast */}
       {savedMsg && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50">
-          <div className="bg-slate-900 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl">
+          <div className="bg-ink text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-xl">
             {savedMsg}
           </div>
         </div>
@@ -243,21 +243,21 @@ function TodayPageInner() {
 
         {/* Weekly photo reminder — appears once a week, dismissible */}
         {showPhotoReminder && (
-          <div className="bg-purple-50 border border-purple-100 rounded-2xl px-4 py-3.5 flex items-center gap-3">
+          <div className="bg-intelligence-soft border border-intelligence/20 rounded-2xl px-4 py-3.5 flex items-center gap-3">
             <Link href="/health-events" className="flex items-center gap-3 flex-1">
               <span className="text-xl flex-shrink-0">📸</span>
               <div className="flex-1">
-                <p className="text-sm font-semibold text-purple-800">
+                <p className="text-sm font-semibold text-intelligence">
                   Weekly photos {weeklyPhotoCount > 0 ? `· ${weeklyPhotoCount}/4 done` : ''}
                 </p>
-                <p className="text-xs text-purple-500 mt-0.5">
+                <p className="text-xs text-intelligence/70 mt-0.5">
                   Tongue, skin, and any flare — takes a minute
                 </p>
               </div>
             </Link>
             <button
               onClick={dismissPhotoReminder}
-              className="text-purple-300 hover:text-purple-500 flex-shrink-0 p-1"
+              className="text-intelligence/40 hover:text-intelligence/70 flex-shrink-0 p-1"
               aria-label="Dismiss"
             >
               <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none">
@@ -287,8 +287,8 @@ function TodayPageInner() {
           type="button"
           onClick={save}
           disabled={saving}
-          className="w-full h-14 rounded-2xl bg-blue-600 text-white font-semibold
-            text-[15px] shadow-md shadow-blue-200 active:scale-[0.98]
+          className="w-full h-14 rounded-2xl bg-primary text-white font-semibold
+            text-[15px] shadow-md shadow-primary/25 active:scale-[0.98]
             transition-transform duration-100 disabled:opacity-60 mt-2
             flex items-center justify-center gap-1.5"
         >
@@ -302,7 +302,7 @@ function TodayPageInner() {
           )}
         </button>
 
-        <p className="text-center text-[11px] text-slate-300 pt-1">
+        <p className="text-center text-[11px] text-ink-faint pt-1">
           {isToday
             ? "You can check in multiple times a day — each save updates today's entry."
             : `Each save updates the entry for ${formatDisplay(date)}.`}
@@ -315,8 +315,8 @@ function TodayPageInner() {
 export default function TodayPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#F7F8FC] flex items-center justify-center">
-        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <TodayPageInner />

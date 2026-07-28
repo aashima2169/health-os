@@ -13,12 +13,12 @@ export default function Button({
       className="
       w-full
       rounded-2xl
-      bg-blue-600
+      bg-primary
       py-4
       font-semibold
       text-white
       transition
-      hover:bg-blue-700"
+      hover:bg-primary/90"
     >
       {children}
     </button>

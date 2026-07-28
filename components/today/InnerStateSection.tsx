@@ -30,7 +30,7 @@ export default function InnerStateSection({ selected, onChange }: InnerStateSect
       completed={completed}
       microcopy="Naming it helps."
     >
-      <p className="text-xs text-slate-400 mb-3">Select all that feel true right now</p>
+      <p className="text-xs text-ink-faint mb-3">Select all that feel true right now</p>
       <div className="flex flex-wrap gap-2">
         {options.map((opt) => (
           <Chip

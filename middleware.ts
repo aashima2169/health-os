@@ -9,7 +9,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const PUBLIC_PATHS = ['/sign-in', '/auth/callback']
+const PUBLIC_PATHS = ['/sign-in', '/auth/callback', '/api/demo']
 const CONSENT_PATH = '/consent'
 
 export async function middleware(request: NextRequest) {
