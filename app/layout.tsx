@@ -1,6 +1,7 @@
 // app/layout.tsx
 import type { Metadata } from 'next'
 import { Inter, Fraunces, IBM_Plex_Mono } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
 import BottomNav from '../components/layout/BottomNav'
 
@@ -42,6 +43,7 @@ export default function RootLayout({
           {children}
           <BottomNav />
         </div>
+        <Analytics />
       </body>
     </html>
   )
